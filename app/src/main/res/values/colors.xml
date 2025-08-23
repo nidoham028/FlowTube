@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="md_theme_background">@color/md_theme_light_background</color>
+	
+	<!-- Normal Colors -->
+	<color name="white">#FFFFFF</color>
+	
+	<!-- Navigation Colors -->
+    <color name="bottom_nav_selected">#F44336</color>
+    <color name="bottom_nav_unselected">#FFFFFF</color>
+    <color name="bottom_nav_background">@color/seed</color>
 </resources>
