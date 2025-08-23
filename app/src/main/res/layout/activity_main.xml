@@ -1,30 +1,28 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
-     xmlns:android="http://schemas.android.com/apk/res/android"
-     xmlns:app="http://schemas.android.com/apk/res-auto"
-     xmlns:tools="http://schemas.android.com/tools"
-     android:layout_height="match_parent"
-     android:layout_width="match_parent"
-     android:background="@color/md_theme_background">
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/md_theme_background" >
 
     <androidx.viewpager2.widget.ViewPager2
-         android:layout_height="match_parent"
-         android:layout_width="match_parent"
-         android:layout_marginBottom="60dp"
-         android:id="@+id/content_page" />
+        android:id="@+id/content_page"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="60dp" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
-         android:layout_height="80dp"
-         android:layout_width="match_parent"
-         android:background="@color/bottom_nav_background"
-         app:itemTextColor="@color/white"
-         app:labelVisibilityMode="labeled"
-         android:elevation="8dp"
-         app:menu="@menu/bottom_navigation"
-         app:itemIconTint="@color/bottom_nav_item_selector"
-         app:itemIconSize="24dp"
-         app:itemRippleColor="@color/seed"
-         android:id="@+id/bottom_nav"
-         android:layout_gravity="bottom" />
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_gravity="bottom"
+        android:background="@color/bottom_nav_background"
+        android:elevation="8dp"
+        app:itemIconSize="24dp"
+        app:itemIconTint="@color/bottom_nav_item_selector"
+        app:itemRippleColor="@color/seed"
+        app:itemTextColor="@color/white"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/bottom_navigation" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
