@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internal app storage for cache files -->
+    <cache-path 
+        name="cache_files" 
+        path="." />
+    
+    <!-- Internal app storage for private files -->
+    <files-path 
+        name="app_files" 
+        path="." />
+    
+    <!-- External storage cache directory -->
+    <external-cache-path 
+        name="external_cache" 
+        path="." />
+    
+    <!-- External storage files directory -->
+    <external-files-path 
+        name="external_files" 
+        path="." />
+    
+    <!-- Downloads folder for shared content -->
+    <external-files-path 
+        name="downloads" 
+        path="Download/" />
+    
+    <!-- Media files in external storage -->
+    <external-files-path 
+        name="media" 
+        path="Media/" />
+    
+    <!-- Temporary files for sharing -->
+    <cache-path 
+        name="temp_files" 
+        path="temp/" />
+</paths>

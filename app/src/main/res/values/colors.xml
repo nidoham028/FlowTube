@@ -4,7 +4,10 @@
 	
 	<!-- Normal Colors -->
 	<color name="white">#FFFFFF</color>
+    
+    
 	<color name="defaultIconTint">#FFFFFF</color>
+    <color name="contrastColor">#000000</color>
 
     <color name="ic_launcher_background">#CD201F</color>
 

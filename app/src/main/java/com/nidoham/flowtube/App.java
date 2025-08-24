@@ -1,497 +1,401 @@
 package com.nidoham.flowtube;
 
 import android.app.Application;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
-import com.nidoham.flowtube.core.language.LanguageManager;
-import com.nidoham.skymate.DownloaderImpl;
+
+import com.nidoham.strivo.settings.ApplicationSettings;
 import com.nidoham.flowtube.core.language.AppLanguage;
 import org.schabi.newpipe.error.ReCaptchaActivity;
 import com.nidoham.strivo.Localization.Localizations;
-import com.nidoham.strivo.settings.ApplicationSettings;
-
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.util.InfoCache;
 import org.schabi.newpipe.util.image.PicassoHelper;
 
-/**
- * Main application class for SkyMate providing centralized initialization and configuration
- * management with comprehensive error handling and Bangladesh-specific localization support.
- * 
- * This class handles critical application lifecycle events including startup initialization,
- * crash management, and memory optimization while ensuring optimal performance for
- * Bangladesh users through hardcoded Bangla language configuration.
- */
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class App extends Application {
 
     public static final boolean DEBUG = BuildConfig.DEBUG;
-    private static final String TAG = "SkymateApp";
+    private static final String TAG = "FlowTubeApp";
     private static final String CRASH_LOG_KEY = "crash_log";
-    private static final String CRASH_TIME_SUFFIX = "_time";
-    private static final String RECAPTCHA_COOKIES_KEY = "recaptcha_cookies_key";
-    
-    // Application state constants
-    private static final int INITIALIZATION_SUCCESS = 0;
-    private static final int INITIALIZATION_FAILURE = -1;
-    
-    // Hardcoded Bangladesh configuration
-    private static final String BANGLADESH_LANGUAGE_CODE = "bn";
+    private static final String CRASH_COUNT_KEY = "crash_count";
+    private static final String LAST_CRASH_TIME_KEY = "last_crash_time";
+    private static final long CRASH_RESET_INTERVAL = 24 * 60 * 60 * 1000L; // 24 hours
+    private static final int MAX_CRASHES_PER_DAY = 5;
 
-    private static App applicationInstance;
-    private DownloaderImpl downloaderImplementation;
-    private boolean isInitializationComplete = false;
+    private static volatile App instance;
+    private DownloaderImpl downloaderImpl;
+    private final AtomicBoolean isInitialized = new AtomicBoolean(false);
+    private Thread.UncaughtExceptionHandler defaultExceptionHandler;
 
-    /**
-     * Primary application initialization method executed during application startup.
-     * Establishes core components including network management, localization, and
-     * error handling systems with specific optimization for Bangladesh users.
-     */
     @Override
     public void onCreate() {
         super.onCreate();
-        applicationInstance = this;
-        initializeAppLanguage();
-
-        Log.i(TAG, "Initializing SkyMate application for Bangladesh market");
-
-        // Configure global exception handling before any other operations
-        configureGlobalExceptionHandling();
-
-        // Initialize core application components with comprehensive error handling
-        final int initializationResult = initializeCoreComponents();
+        instance = this;
         
-        if (initializationResult == INITIALIZATION_SUCCESS) {
-            isInitializationComplete = true;
-            Log.i(TAG, "SkyMate application initialization completed successfully");
-        } else {
-            Log.e(TAG, "SkyMate application initialization failed with critical errors");
-            handleInitializationFailure();
+        // Store the default exception handler before setting our custom one
+        defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(this::handleUncaughtException);
+
+        performInitialization();
+    }
+
+    private void performInitialization() {
+        try {
+            initializeBasicComponents();
+            initializeNewPipeServices();
+            setupApplicationLocalization();
+            
+            isInitialized.set(true);
+            Log.i(TAG, "FlowTube application initialized successfully");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Critical initialization failure", e);
+            handleInitializationFailure(e);
         }
     }
-    
-    private void initializeAppLanguage() {
-        AppLanguage.getInstance(this).initialize();
-    }
 
-    /**
-     * Establishes comprehensive global exception handling to ensure graceful application
-     * failure management and detailed crash reporting for debugging purposes.
-     */
-    private void configureGlobalExceptionHandling() {
-        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-            Log.e(TAG, "Uncaught exception detected in thread: " + thread.getName(), throwable);
-            handleApplicationCrash(thread, throwable);
-        });
-        
-        Log.d(TAG, "Global exception handling configured successfully");
-    }
-
-    /**
-     * Initializes all essential application components including settings management,
-     * image processing, language configuration, and network components.
-     * 
-     * @return INITIALIZATION_SUCCESS if all components initialize successfully,
-     *         INITIALIZATION_FAILURE otherwise
-     */
-    private int initializeCoreComponents() {
+    private void initializeBasicComponents() {
         try {
-            // Initialize application settings infrastructure
             ApplicationSettings.getInstance(this);
-            Log.d(TAG, "Application settings initialized");
-
-            // Configure image processing components
+            AppLanguage.getInstance(this).initialize();
             PicassoHelper.init(this);
-            Log.d(TAG, "Image processing components initialized");
-
-            // Establish Bangladesh-specific language configuration
-            final boolean languageInitialized = initializeBangladeshLanguageSettings();
-            if (!languageInitialized) {
-                Log.w(TAG, "Language initialization encountered issues but continuing");
+            
+            if (DEBUG) {
+                Log.d(TAG, "Basic application components initialized");
             }
-
-            // Initialize network and extraction components
-            initializeNetworkComponents();
-            
-            // Apply Bangladesh-specific localization settings
-            configureBangladeshLocalization();
-
-            return INITIALIZATION_SUCCESS;
-            
-        } catch (Exception criticalError) {
-            Log.e(TAG, "Critical error during core component initialization", criticalError);
-            return INITIALIZATION_FAILURE;
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing basic components", e);
+            throw new RuntimeException("Failed to initialize core application components", e);
         }
     }
 
-    /**
-     * Configures language management specifically for Bangladesh users with hardcoded
-     * Bangla language settings to ensure consistent user experience.
-     * 
-     * @return true if language initialization completes successfully, false otherwise
-     */
-    private boolean initializeBangladeshLanguageSettings() {
+    private void initializeNewPipeServices() throws ExtractionException {
         try {
-            final LanguageManager languageManager = new LanguageManager(this);
-            languageManager.initialize();
-            languageManager.setLanguage(BANGLADESH_LANGUAGE_CODE);
+            downloaderImpl = DownloaderImpl.init(null);
+            if (downloaderImpl == null) {
+                throw new ExtractionException("DownloaderImpl initialization returned null");
+            }
             
-            Log.i(TAG, "Bangladesh language settings configured with Bangla as primary language");
-            return true;
+            applyStoredCookies(downloaderImpl);
+            NewPipe.init(downloaderImpl);
             
-        } catch (Exception languageError) {
-            Log.e(TAG, "Error configuring Bangladesh language settings", languageError);
-            return false;
-        }
-    }
-
-    /**
-     * Initializes network components including the NewPipe extractor system and
-     * downloader implementation with Bangladesh-specific configuration.
-     * 
-     * @throws ExtractionException if network component initialization fails
-     */
-    private void initializeNetworkComponents() throws ExtractionException {
-        try {
-            downloaderImplementation = DownloaderImpl.init(null);
-            configureCookieManagement(downloaderImplementation);
-            NewPipe.init(downloaderImplementation);
+            // Clear cache to ensure fresh start
             InfoCache.getInstance().clearCache();
             
-            Log.d(TAG, "Network components initialized with Bangladesh configuration");
-            
-        } catch (Exception networkError) {
-            throw new ExtractionException("Failed to initialize network components for Bangladesh users", networkError);
-        }
-    }
-
-    /**
-     * Configures cookie management including reCAPTCHA and YouTube restricted mode
-     * cookies with appropriate error handling for missing resources.
-     * 
-     * @param downloader The downloader instance to configure with cookies
-     */
-    private void configureCookieManagement(final DownloaderImpl downloader) {
-        final SharedPreferences applicationPreferences = getApplicationPreferences();
-        
-        // Configure reCAPTCHA cookies with fallback handling
-        configureReCaptchaCookies(downloader, applicationPreferences);
-        
-        // Configure YouTube restricted mode settings
-        configureYouTubeRestrictedMode(downloader);
-    }
-
-    /**
-     * Configures reCAPTCHA cookie settings from stored preferences with comprehensive
-     * error handling for missing or corrupted cookie data.
-     * 
-     * @param downloader The downloader instance to configure
-     * @param preferences Shared preferences containing cookie data
-     */
-    private void configureReCaptchaCookies(final DownloaderImpl downloader, final SharedPreferences preferences) {
-        try {
-            final String cookieResourceKey = getString(R.string.recaptcha_cookies_key);
-            final String storedCookieData = preferences.getString(cookieResourceKey, null);
-            
-            if (storedCookieData != null && !storedCookieData.trim().isEmpty()) {
-                downloader.setCookie(ReCaptchaActivity.RECAPTCHA_COOKIES_KEY, storedCookieData);
-                Log.d(TAG, "reCAPTCHA cookies configured successfully");
-            } else {
-                Log.d(TAG, "No stored reCAPTCHA cookies found, proceeding with default configuration");
+            if (DEBUG) {
+                Log.d(TAG, "NewPipe services initialized successfully");
             }
             
-        } catch (Exception cookieError) {
-            Log.w(TAG, "reCAPTCHA cookie configuration failed, using fallback settings", cookieError);
+        } catch (Exception e) {
+            Log.e(TAG, "NewPipe initialization failed", e);
+            throw new ExtractionException("Failed to initialize NewPipe services", e);
         }
     }
 
-    /**
-     * Configures YouTube restricted mode settings with error handling to ensure
-     * graceful degradation if configuration fails.
-     * 
-     * @param downloader The downloader instance to configure
-     */
-    private void configureYouTubeRestrictedMode(final DownloaderImpl downloader) {
+    private void applyStoredCookies(@NonNull DownloaderImpl downloader) {
+        final SharedPreferences preferences = getDefaultSharedPreferences();
+        
+        // Apply reCAPTCHA cookies if available
+        try {
+            final String cookieKey = getResources().getString(R.string.recaptcha_cookies_key);
+            final String storedCookies = preferences.getString(cookieKey, null);
+            
+            if (storedCookies != null && !storedCookies.trim().isEmpty()) {
+                downloader.setCookie(ReCaptchaActivity.RECAPTCHA_COOKIES_KEY, storedCookies);
+                if (DEBUG) {
+                    Log.d(TAG, "Applied stored reCAPTCHA cookies");
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "reCAPTCHA cookie resource not available or malformed", e);
+        }
+
+        // Apply YouTube restricted mode settings
         try {
             downloader.updateYoutubeRestrictedModeCookies(this);
-            Log.d(TAG, "YouTube restricted mode configured for Bangladesh users");
-            
-        } catch (Exception restrictedModeError) {
-            Log.w(TAG, "YouTube restricted mode configuration failed, using default settings", restrictedModeError);
+            if (DEBUG) {
+                Log.d(TAG, "YouTube restricted mode cookies applied");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to apply YouTube restricted mode settings", e);
         }
     }
 
-    /**
-     * Applies Bangladesh-specific localization settings throughout the application
-     * with error handling to ensure graceful degradation.
-     */
-    private void configureBangladeshLocalization() {
+    private void setupApplicationLocalization() {
         try {
             Localizations.applySettingsLocale(this);
-            Log.d(TAG, "Bangladesh localization settings applied successfully");
-            
-        } catch (Exception localizationError) {
-            Log.w(TAG, "Bangladesh localization configuration encountered errors", localizationError);
-        }
-    }
-
-    /**
-     * Handles critical initialization failures by attempting graceful recovery
-     * or controlled application termination with appropriate logging.
-     */
-    private void handleInitializationFailure() {
-        Log.e(TAG, "Application initialization failed critically, attempting recovery procedures");
-        
-        // Attempt to save failure state for debugging purposes
-        saveCriticalFailureLog("Application initialization failed during startup");
-        
-        // Consider implementing recovery mechanisms or safe mode here
-        // For now, we continue execution but mark initialization as incomplete
-    }
-
-    /**
-     * Comprehensive application crash handler that logs crash details, saves crash
-     * information for debugging, and attempts to launch debug activity before termination.
-     * 
-     * @param crashThread The thread where the crash occurred
-     * @param crashThrowable The exception that caused the crash
-     */
-    private void handleApplicationCrash(final Thread crashThread, final Throwable crashThrowable) {
-        final String detailedCrashLog = Log.getStackTraceString(crashThrowable);
-        
-        Log.e(TAG, String.format("Application crashed in thread: %s", crashThread.getName()), crashThrowable);
-        
-        // Save crash information for post-mortem analysis
-        saveCrashLogData(detailedCrashLog);
-        
-        // Attempt to launch debug interface for user feedback
-        launchDebugInterface(detailedCrashLog);
-        
-        // Terminate application process after cleanup
-        terminateApplicationProcess();
-    }
-
-    /**
-     * Launches debug activity safely with comprehensive error handling and thread
-     * management to ensure proper execution context.
-     * 
-     * @param crashLogData The crash log information to pass to debug activity
-     */
-    private void launchDebugInterface(final String crashLogData) {
-        final Intent debugIntent = createDebugIntent(crashLogData);
-        
-        final Runnable debugLauncher = () -> {
-            try {
-                startActivity(debugIntent);
-                Log.d(TAG, "Debug activity launched successfully");
-                
-            } catch (Exception debugLaunchError) {
-                Log.e(TAG, "Failed to launch debug activity", debugLaunchError);
+            if (DEBUG) {
+                Log.d(TAG, "Application localization configured");
             }
-        };
-
-        executeOnMainThread(debugLauncher);
-    }
-
-    /**
-     * Creates properly configured intent for debug activity with crash information
-     * and appropriate flags for emergency launch scenarios.
-     * 
-     * @param crashLogData The crash log information to include in the intent
-     * @return Configured intent for debug activity launch
-     */
-    private Intent createDebugIntent(final String crashLogData) {
-        return new Intent(this, DebugActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | 
-                         Intent.FLAG_ACTIVITY_CLEAR_TOP | 
-                         Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                .putExtra("error_message", crashLogData)
-                .putExtra("crash_time", System.currentTimeMillis())
-                .putExtra("app_version", BuildConfig.VERSION_NAME)
-                .putExtra("bangladesh_config", true);
-    }
-
-    /**
-     * Ensures runnable execution on the main UI thread with proper looper handling
-     * for thread-safe UI operations during crash scenarios.
-     * 
-     * @param runnable The runnable to execute on the main thread
-     */
-    private void executeOnMainThread(final Runnable runnable) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            runnable.run();
-        } else {
-            new Handler(Looper.getMainLooper()).post(runnable);
+        } catch (Exception e) {
+            Log.w(TAG, "Error configuring application localization", e);
         }
     }
 
-    /**
-     * Persists crash log information to shared preferences for debugging and
-     * analysis purposes with timestamp and version information.
-     * 
-     * @param crashLogData The detailed crash log information to save
-     */
-    private void saveCrashLogData(final String crashLogData) {
+    private void handleInitializationFailure(@NonNull Exception e) {
+        final String errorMessage = "Critical application initialization failure";
+        Log.e(TAG, errorMessage, e);
+        
+        // Save initialization error details
+        saveErrorDetails(errorMessage, e);
+        
+        // Attempt to launch debug activity
         try {
-            getApplicationPreferences()
-                    .edit()
-                    .putString(CRASH_LOG_KEY, crashLogData)
-                    .putLong(CRASH_LOG_KEY + CRASH_TIME_SUFFIX, System.currentTimeMillis())
-                    .putString(CRASH_LOG_KEY + "_version", BuildConfig.VERSION_NAME)
-                    .apply();
-                    
-            Log.d(TAG, "Crash log data saved successfully");
-            
-        } catch (Exception saveError) {
-            Log.w(TAG, "Failed to save crash log data", saveError);
+            launchDebugActivity(errorMessage, e);
+        } catch (Exception debugException) {
+            Log.e(TAG, "Failed to launch debug activity after initialization failure", debugException);
         }
+        
+        // Terminate application gracefully
+        terminateApplication();
     }
 
-    /**
-     * Saves critical failure information for debugging purposes when initialization
-     * fails before normal crash handling can be established.
-     * 
-     * @param failureMessage Description of the critical failure
-     */
-    private void saveCriticalFailureLog(final String failureMessage) {
-        try {
-            getApplicationPreferences()
-                    .edit()
-                    .putString("critical_failure", failureMessage)
-                    .putLong("critical_failure_time", System.currentTimeMillis())
-                    .apply();
-                    
-        } catch (Exception saveError) {
-            Log.w(TAG, "Failed to save critical failure log", saveError);
-        }
-    }
-
-    /**
-     * Terminates the application process after ensuring all cleanup operations
-     * have completed and crash information has been saved.
-     */
-    private void terminateApplicationProcess() {
-        Log.i(TAG, "Terminating application process after crash handling completion");
-        android.os.Process.killProcess(android.os.Process.myPid());
-    }
-
-    /**
-     * Updates YouTube restriction settings and clears relevant caches to ensure
-     * settings take effect immediately for Bangladesh users.
-     */
-    public void updateYouTubeRestrictionSettings() {
-        if (downloaderImplementation != null && isInitializationComplete) {
-            try {
-                downloaderImplementation.updateYoutubeRestrictedModeCookies(this);
-                InfoCache.getInstance().clearCache();
-                
-                Log.d(TAG, "YouTube restriction settings updated for Bangladesh users");
-                
-            } catch (Exception updateError) {
-                Log.e(TAG, "Error updating YouTube restriction settings", updateError);
+    private void handleUncaughtException(@NonNull Thread thread, @NonNull Throwable throwable) {
+        Log.e(TAG, "Uncaught exception in thread: " + thread.getName(), throwable);
+        
+        // Check crash frequency to prevent crash loops
+        if (shouldPreventCrashLoop()) {
+            Log.w(TAG, "Too many crashes detected, delegating to system handler");
+            if (defaultExceptionHandler != null) {
+                defaultExceptionHandler.uncaughtException(thread, throwable);
             }
-        } else {
-            Log.w(TAG, "Cannot update YouTube restrictions: downloader not initialized or initialization incomplete");
+            return;
         }
+        
+        recordCrashOccurrence();
+        
+        final String crashDetails = generateCrashReport(throwable, thread);
+        saveErrorDetails("Application crash", throwable);
+        
+        try {
+            launchDebugActivity(crashDetails, throwable);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch debug activity after crash", e);
+        }
+        
+        terminateApplication();
     }
 
-    /**
-     * Retrieves the configured downloader implementation instance.
-     * 
-     * @return The downloader implementation or null if not initialized
-     */
-    public DownloaderImpl getDownloaderInstance() {
-        return downloaderImplementation;
+    private boolean shouldPreventCrashLoop() {
+        final SharedPreferences preferences = getDefaultSharedPreferences();
+        final long currentTime = System.currentTimeMillis();
+        final long lastCrashTime = preferences.getLong(LAST_CRASH_TIME_KEY, 0);
+        final int crashCount = preferences.getInt(CRASH_COUNT_KEY, 0);
+        
+        // Reset crash count if enough time has passed
+        if (currentTime - lastCrashTime > CRASH_RESET_INTERVAL) {
+            preferences.edit()
+                    .putInt(CRASH_COUNT_KEY, 0)
+                    .putLong(LAST_CRASH_TIME_KEY, currentTime)
+                    .apply();
+            return false;
+        }
+        
+        return crashCount >= MAX_CRASHES_PER_DAY;
     }
 
-    /**
-     * Provides access to the application singleton instance with null safety.
-     * 
-     * @return The application instance, creating one if necessary
-     */
-    public static App getApplicationInstance() {
-        return applicationInstance != null ? applicationInstance : new App();
-    }
-
-    /**
-     * Retrieves saved crash log information from application preferences.
-     * 
-     * @param applicationContext The application context for preference access
-     * @return The saved crash log or null if no crash log exists
-     */
-    public static String retrieveSavedCrashLog(final Application applicationContext) {
-        return PreferenceManager.getDefaultSharedPreferences(applicationContext)
-                .getString(CRASH_LOG_KEY, null);
-    }
-
-    /**
-     * Clears all saved crash log information from application preferences.
-     * 
-     * @param applicationContext The application context for preference access
-     */
-    public static void clearSavedCrashInformation(final Application applicationContext) {
-        PreferenceManager.getDefaultSharedPreferences(applicationContext)
-                .edit()
-                .remove(CRASH_LOG_KEY)
-                .remove(CRASH_LOG_KEY + CRASH_TIME_SUFFIX)
-                .remove(CRASH_LOG_KEY + "_version")
-                .remove("critical_failure")
-                .remove("critical_failure_time")
+    private void recordCrashOccurrence() {
+        final SharedPreferences preferences = getDefaultSharedPreferences();
+        final int currentCrashCount = preferences.getInt(CRASH_COUNT_KEY, 0);
+        
+        preferences.edit()
+                .putInt(CRASH_COUNT_KEY, currentCrashCount + 1)
+                .putLong(LAST_CRASH_TIME_KEY, System.currentTimeMillis())
                 .apply();
     }
 
-    /**
-     * Retrieves the default shared preferences instance for the application.
-     * 
-     * @return SharedPreferences instance for application-wide settings
-     */
-    private SharedPreferences getApplicationPreferences() {
+    private void saveErrorDetails(@NonNull String description, @NonNull Throwable throwable) {
+        try {
+            final String crashReport = generateCrashReport(throwable, Thread.currentThread());
+            final long timestamp = System.currentTimeMillis();
+            
+            getDefaultSharedPreferences().edit()
+                    .putString(CRASH_LOG_KEY, crashReport)
+                    .putLong(CRASH_LOG_KEY + "_time", timestamp)
+                    .putString(CRASH_LOG_KEY + "_description", description)
+                    .apply();
+                    
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to save error details", e);
+        }
+    }
+
+    private String generateCrashReport(@NonNull Throwable throwable, @NonNull Thread thread) {
+        final StringBuilder reportBuilder = new StringBuilder();
+        final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        
+        reportBuilder.append("=== FlowTube Crash Report ===\n");
+        reportBuilder.append("Time: ").append(dateFormat.format(new Date())).append("\n");
+        reportBuilder.append("Thread: ").append(thread.getName()).append("\n");
+        reportBuilder.append("Exception: ").append(throwable.getClass().getSimpleName()).append("\n");
+        reportBuilder.append("Message: ").append(throwable.getMessage()).append("\n");
+        reportBuilder.append("Stack Trace:\n");
+        
+        final StringWriter stringWriter = new StringWriter();
+        final PrintWriter printWriter = new PrintWriter(stringWriter);
+        throwable.printStackTrace(printWriter);
+        reportBuilder.append(stringWriter.toString());
+        
+        return reportBuilder.toString();
+    }
+
+    private void launchDebugActivity(@NonNull String errorMessage, @NonNull Throwable throwable) {
+        final Intent debugIntent = new Intent(this, DebugActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | 
+                         Intent.FLAG_ACTIVITY_CLEAR_TOP | 
+                         Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                .putExtra("error_message", errorMessage)
+                .putExtra("stack_trace", Log.getStackTraceString(throwable))
+                .putExtra("crash_time", System.currentTimeMillis())
+                .putExtra("thread_name", Thread.currentThread().getName());
+
+        final Runnable launchRunnable = () -> {
+            try {
+                startActivity(debugIntent);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to launch debug activity", e);
+            }
+        };
+
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            launchRunnable.run();
+        } else {
+            new Handler(Looper.getMainLooper()).post(launchRunnable);
+        }
+    }
+
+    private void terminateApplication() {
+        try {
+            // Allow brief time for debug activity launch
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        android.os.Process.killProcess(android.os.Process.myPid());
+    }
+
+    public void refreshYouTubeConfiguration() {
+        if (downloaderImpl != null && isInitialized.get()) {
+            try {
+                downloaderImpl.updateYoutubeRestrictedModeCookies(this);
+                InfoCache.getInstance().clearCache();
+                Log.d(TAG, "YouTube configuration refreshed");
+            } catch (Exception e) {
+                Log.e(TAG, "Error refreshing YouTube configuration", e);
+            }
+        } else {
+            Log.w(TAG, "Cannot refresh YouTube configuration: downloader not initialized");
+        }
+    }
+
+    @Nullable
+    public DownloaderImpl getDownloader() {
+        return downloaderImpl;
+    }
+
+    public boolean isApplicationInitialized() {
+        return isInitialized.get();
+    }
+
+    @NonNull
+    public static App getInstance() {
+        if (instance == null) {
+            throw new IllegalStateException("Application instance not available");
+        }
+        return instance;
+    }
+
+    @Nullable
+    public static String retrieveSavedCrashLog(@NonNull Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getString(CRASH_LOG_KEY, null);
+    }
+
+    public static void clearSavedCrashLog(@NonNull Context context) {
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+                .remove(CRASH_LOG_KEY)
+                .remove(CRASH_LOG_KEY + "_time")
+                .remove(CRASH_LOG_KEY + "_description")
+                .apply();
+    }
+
+    @NonNull
+    private SharedPreferences getDefaultSharedPreferences() {
         return PreferenceManager.getDefaultSharedPreferences(this);
     }
 
-    /**
-     * Handles system memory pressure by implementing intelligent cache management
-     * strategies based on the severity of memory constraints.
-     * 
-     * @param memoryLevel The system memory pressure level indicator
-     */
     @Override
-    public void onTrimMemory(final int memoryLevel) {
-        super.onTrimMemory(memoryLevel);
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
         
-        final InfoCache cacheManager = InfoCache.getInstance();
+        if (!isInitialized.get()) {
+            return;
+        }
         
-        switch (memoryLevel) {
+        final InfoCache cache = InfoCache.getInstance();
+        
+        switch (level) {
             case TRIM_MEMORY_RUNNING_MODERATE:
-                cacheManager.trimCache();
-                Log.d(TAG, "Cache trimmed due to moderate memory pressure");
+                cache.trimCache();
+                if (DEBUG) {
+                    Log.d(TAG, "Memory trimmed: moderate pressure");
+                }
                 break;
                 
             case TRIM_MEMORY_RUNNING_LOW:
             case TRIM_MEMORY_RUNNING_CRITICAL:
-                cacheManager.clearCache();
-                Log.d(TAG, "Cache cleared due to critical memory pressure");
+                cache.clearCache();
+                if (downloaderImpl != null) {
+                    // Clear some cookies to free memory if needed
+                    downloaderImpl.clearAllCookies();
+                    // Reapply essential cookies
+                    applyStoredCookies(downloaderImpl);
+                }
+                if (DEBUG) {
+                    Log.d(TAG, "Memory cleared: high pressure (level " + level + ")");
+                }
+                break;
+                
+            case TRIM_MEMORY_UI_HIDDEN:
+                cache.trimCache();
+                if (DEBUG) {
+                    Log.d(TAG, "UI hidden, trimming cache");
+                }
                 break;
                 
             default:
                 if (DEBUG) {
-                    Log.d(TAG, String.format("Memory trim level %d handled with default behavior", memoryLevel));
+                    Log.d(TAG, "Memory trim level: " + level);
                 }
-                break;
         }
     }
 
-    /**
-     * Provides information about the current initialization state for debugging purposes.
-     * 
-     * @return true if initialization completed successfully, false otherwise
-     */
-    public boolean isApplicationInitializationComplete() {
-        return isInitializationComplete;
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        
+        if (isInitialized.get()) {
+            InfoCache.getInstance().clearCache();
+            if (DEBUG) {
+                Log.d(TAG, "Low memory condition: cache cleared");
+            }
+        }
     }
 }

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="2dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp"
+    android:backgroundTint="@android:color/transparent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="16dp">
+
+        <!-- Video Thumbnail + Duration -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="250dp"
+            android:layout_marginBottom="8dp">
+
+            <ImageView
+                android:id="@+id/img_thumb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Video Thumbnail" />
+
+            <TextView
+                android:id="@+id/txt_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="8dp"
+                android:background="@drawable/duration_background"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="2:26"
+                android:textColor="@color/contrastColor"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <!-- Channel Info Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:gravity="center_vertical">
+
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:id="@+id/img_avatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="12dp"
+                android:src="@drawable/placeholder_person"
+                android:contentDescription="Channel Logo"
+                android:scaleType="centerCrop" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/txt_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="এবার অনুসন্ধানে বেরিয়ে এলো সোনাম হত্যা-র আসল তথ্য | Mitford | ..."
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textStyle="normal" />
+
+                <TextView
+                    android:id="@+id/txt_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Channel 24 • 1 day ago • 2.3M views"
+                    android:textColor="@android:color/darker_gray"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/btn_more"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_more_vert"
+                android:contentDescription="More Options"
+                android:scaleType="centerInside"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

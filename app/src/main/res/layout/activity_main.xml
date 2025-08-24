@@ -1,15 +1,101 @@
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/md_theme_background" >
+    android:background="@color/md_theme_background"
+    android:fitsSystemWindows="true">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/seed"
+        android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            app:contentInsetStart="16dp"
+            app:contentInsetEnd="16dp">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="8dp">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/app_logo"
+                    android:layout_width="55dp"
+                    android:layout_height="55dp"
+                    android:padding="6dp"
+                    android:scaleType="centerCrop"
+                    android:src="@mipmap/ic_launcher"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:shapeAppearanceOverlay="@style/CircularImageView" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/title_text"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/poppins_semibold"
+                    android:maxLines="1"
+                    android:text="@string/app_name"
+                    android:textColor="@color/white"
+                    android:textSize="20sp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/action_buttons_container"
+                    app:layout_constraintStart_toEndOf="@id/app_logo"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <LinearLayout
+                    android:id="@+id/action_buttons_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/search_btn"
+                        style="@style/Widget.Material3.Button.IconButton"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        app:icon="@drawable/ic_search"
+                        app:iconSize="24dp"
+                        app:iconTint="@color/white" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/menu_btn"
+                        style="@style/Widget.Material3.Button.IconButton"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        app:icon="@drawable/ic_more_vert"
+                        app:iconSize="24dp"
+                        app:iconTint="@color/white" />
+
+                </LinearLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+    </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/content_page"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginBottom="60dp" />
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
