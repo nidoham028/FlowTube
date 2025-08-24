@@ -1,8 +1,8 @@
-<resources>
-    <string name="app_name">FlowTube</string>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name" tools:ignore="MissingTranslation">FlowTube</string>
 	
-	<!-- Splash Screen -->
-	<string name="splash_message">Experience a better way to browse YouTube</string>
+    <!-- Splash Screen -->
+    <string name="splash_message">Experience a better way to browse YouTube</string>
 	
     <!-- Bottom Navigation -->
     <string name="btn_nav_home">Home</string>

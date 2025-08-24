@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<!-- Splash Screen -->
-	<string name="splash_message">YouTube ব্রাউজ করার একটি উন্নত অভিজ্ঞতা নিন</string>
+    <!-- Splash Screen -->
+    <string name="splash_message">YouTube ব্রাউজ করার একটি উন্নত অভিজ্ঞতা নিন</string>
 	
     <!-- Bottom Navigation -->
     <string name="btn_nav_home">হোম</string>
