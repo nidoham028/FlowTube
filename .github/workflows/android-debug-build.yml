@@ -21,8 +21,13 @@ jobs:
         java-version: '8'
         distribution: 'temurin'
 
-    - name: Android SDK সেটআপ করুন
-      uses: android-actions/setup-android@v3
+    - name: Android SDK এবং build-tools সেটআপ করুন
+      uses: android-actions/setup-android@v2  # v2 ব্যবহার করুন
+
+    - name: প্রয়োজনীয় Android packages ইনস্টল করুন
+      run: |
+        echo "y" | sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+        sdkmanager --licenses
 
     - name: Gradle ক্যাশে করুন
       uses: actions/cache@v3
