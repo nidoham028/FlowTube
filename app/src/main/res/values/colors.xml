@@ -4,6 +4,7 @@
 	
 	<!-- Normal Colors -->
 	<color name="white">#FFFFFF</color>
+	<color name="defaultIconTint">#FFFFFF</color>
 	
 	<!-- Navigation Colors -->
     <color name="bottom_nav_selected">#F44336</color>
