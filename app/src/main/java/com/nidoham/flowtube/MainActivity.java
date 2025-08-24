@@ -72,19 +72,18 @@ public class MainActivity extends AppCompatActivity {
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             
-            switch (itemId) {
-                case R.id.nav_home:
-                    viewPager.setCurrentItem(0, false);
-                    return true;
-                case R.id.nav_community:
-                    viewPager.setCurrentItem(1, false);
-                    return true;
-                case R.id.nav_library:
-                    viewPager.setCurrentItem(2, false);
-                    return true;
-                case R.id.nav_subscription:
-                    viewPager.setCurrentItem(3, false);
-                    return true;
+            if (itemId == R.id.nav_home) {
+                viewPager.setCurrentItem(0, false);
+                return true;
+            } else if (itemId == R.id.nav_community) {
+                viewPager.setCurrentItem(1, false);
+                return true;
+            } else if (itemId == R.id.nav_library) {
+                viewPager.setCurrentItem(2, false);
+                return true;
+            } else if (itemId == R.id.nav_subscription) {
+                viewPager.setCurrentItem(3, false);
+                return true;
             }
             return false;
         });
@@ -99,19 +98,18 @@ public class MainActivity extends AppCompatActivity {
                 bottomNav.getMenu().getItem(position).setChecked(true);
                 bottomNav.setOnItemSelectedListener(item -> {
                     int itemId = item.getItemId();
-                    switch (itemId) {
-                        case R.id.nav_home:
-                            viewPager.setCurrentItem(0, false);
-                            return true;
-                        case R.id.nav_community:
-                            viewPager.setCurrentItem(1, false);
-                            return true;
-                        case R.id.nav_library:
-                            viewPager.setCurrentItem(2, false);
-                            return true;
-                        case R.id.nav_subscription:
-                            viewPager.setCurrentItem(3, false);
-                            return true;
+                    if (itemId == R.id.nav_home) {
+                        viewPager.setCurrentItem(0, false);
+                        return true;
+                    } else if (itemId == R.id.nav_community) {
+                        viewPager.setCurrentItem(1, false);
+                        return true;
+                    } else if (itemId == R.id.nav_library) {
+                        viewPager.setCurrentItem(2, false);
+                        return true;
+                    } else if (itemId == R.id.nav_subscription) {
+                        viewPager.setCurrentItem(3, false);
+                        return true;
                     }
                     return false;
                 });
