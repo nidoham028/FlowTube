@@ -21,13 +21,9 @@ jobs:
         java-version: '8'
         distribution: 'temurin'
 
-    - name: Android SDK এবং build-tools সেটআপ করুন
-      uses: android-actions/setup-android@v2  # v2 ব্যবহার করুন
-
-    - name: প্রয়োজনীয় Android packages ইনস্টল করুন
+    - name: Android SDK লাইসেন্স একসেপ্ট করুন
       run: |
-        echo "y" | sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        sdkmanager --licenses
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
 
     - name: Gradle ক্যাশে করুন
       uses: actions/cache@v3
@@ -51,11 +47,3 @@ jobs:
         name: debug-apk
         path: app/build/outputs/apk/debug/*.apk
         if-no-files-found: error
-
-    - name: বিল্ড রিপোর্ট আপলোড করুন
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-reports
-        path: app/build/reports/
-        if-no-files-found: ignore
