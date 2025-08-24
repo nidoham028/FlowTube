@@ -35,38 +35,36 @@
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
                      android:layout_centerInParent="true"
-                     android:gravity="center_vertical"
                      android:orientation="horizontal">
 
                     <ImageView
-                         android:layout_height="56dp"
-                         android:layout_width="56dp"
+                         android:layout_height="48dp"
+                         android:layout_width="48dp"
+                         android:layout_marginEnd="40dp"
                          android:src="@drawable/ic_forward"
-                         android:layout_marginEnd="24dp"
-                         android:alpha="0.9"
-                         android:elevation="4dp"
-                         android:padding="12dp"
+                         android:background="?attr/selectableItemBackgroundBorderless"
+                         android:padding="8dp"
                          app:tint="#FFFFFF"
                          android:id="@+id/previousButton" />
 
                     <ImageView
-                         android:layout_height="72dp"
-                         android:layout_width="72dp"
+                         android:layout_height="64dp"
+                         android:layout_width="64dp"
                          android:src="@drawable/ic_play_circle_filled"
-                         android:elevation="4dp"
-                         android:padding="6dp"
+                         android:background="?attr/selectableItemBackgroundBorderless"
+                         android:padding="4dp"
+                         android:layout_marginBottom="20dp"
                          app:tint="#FFFFFF"
                          android:id="@+id/centerPlayButton" />
 
                     <ImageView
-                         android:layout_height="56dp"
-                         android:layout_width="56dp"
+                         android:layout_height="48dp"
+                         android:layout_width="48dp"
                          android:src="@drawable/ic_replay"
-                         android:alpha="0.9"
-                         android:elevation="4dp"
-                         android:padding="12dp"
+                         android:background="?attr/selectableItemBackgroundBorderless"
+                         android:padding="8dp"
                          app:tint="#FFFFFF"
-                         android:layout_marginStart="24dp"
+                         android:layout_marginStart="40dp"
                          android:id="@+id/nextButton" />
 
                 </LinearLayout>
@@ -75,60 +73,45 @@
                      android:layout_height="wrap_content"
                      android:layout_width="match_parent"
                      android:background="@drawable/bottom_controls_gradient"
+                     android:padding="12dp"
                      android:orientation="vertical"
-                     android:paddingBottom="12dp"
                      android:layout_alignParentBottom="true"
-                     android:paddingHorizontal="12dp"
-                     android:id="@+id/bottomControls"
-                     android:paddingTop="16dp">
+                     android:id="@+id/bottomControls">
 
                     <SeekBar
                          android:layout_height="wrap_content"
                          android:layout_width="match_parent"
                          android:layout_marginBottom="8dp"
-                         android:minHeight="4dp"
                          android:progressBackgroundTint="#333333"
                          android:thumbTint="#FF0000"
                          android:progressTint="#FF0000"
-                         android:secondaryProgressTint="#444444"
                          android:id="@+id/seekBar" />
 
                     <LinearLayout
                          android:layout_height="wrap_content"
                          android:layout_width="match_parent"
-                         android:gravity="center_vertical"
-                         android:orientation="horizontal">
+                         android:gravity="center_vertical">
 
                         <TextView
                              android:layout_height="wrap_content"
                              android:layout_width="wrap_content"
-                             android:textSize="13sp"
-                             android:fontFamily="sans-serif-medium"
+                             android:textSize="12sp"
                              android:textColor="#FFFFFF"
                              android:id="@+id/timeDisplay"
-                             android:text="0:10 / 2:29:35"
-                             android:textStyle="bold" />
+                             android:text="0:10 / 2:29:35" />
 
-                        <View
+                        <Space
                              android:layout_height="1dp"
                              android:layout_width="0dp"
                              android:layout_weight="1" />
 
-                        <LinearLayout
-                             android:layout_height="wrap_content"
-                             android:layout_width="wrap_content"
-                             android:gravity="center_vertical"
-                             android:orientation="horizontal">
-
-                            <ImageButton
-                                 android:layout_height="32dp"
-                                 android:layout_width="32dp"
-                                 android:src="@drawable/ic_fullscreen"
-                                 android:background="@drawable/control_button_background"
-                                 app:tint="#FFFFFF"
-                                 android:id="@+id/fullscreenButton" />
-
-                        </LinearLayout>
+                        <ImageButton
+                             android:layout_height="32dp"
+                             android:layout_width="32dp"
+                             android:src="@drawable/ic_fullscreen"
+                             android:background="@drawable/control_button_background"
+                             app:tint="#FFFFFF"
+                             android:id="@+id/fullscreenButton" />
 
                     </LinearLayout>
 
@@ -136,47 +119,30 @@
 
             </RelativeLayout>
 
-            <androidx.recyclerview.widget.RecyclerView
-                 android:layout_height="72dp"
-                 android:layout_width="match_parent"
-                 android:layout_marginBottom="80dp"
-                 android:visibility="gone"
-                 android:layout_marginHorizontal="12dp"
-                 android:orientation="horizontal"
-                 android:id="@+id/suggestedVideosRecyclerView"
-                 android:layout_gravity="bottom" />
-
         </FrameLayout>
 
         <LinearLayout
              android:layout_height="wrap_content"
              android:layout_width="match_parent"
-             android:background="#0F0F0F"
-             android:orientation="vertical"
-             android:paddingHorizontal="16dp"
-             android:paddingTop="12dp">
+             android:padding="16dp"
+             android:orientation="vertical">
 
             <LinearLayout
                  android:layout_height="wrap_content"
                  android:layout_width="match_parent"
                  android:layout_marginBottom="8dp"
-                 android:gravity="top"
                  android:orientation="horizontal">
 
                 <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="0dp"
-                     android:layout_marginEnd="8dp"
                      android:ellipsize="end"
-                     android:textSize="18sp"
+                     android:textSize="16sp"
                      android:textColor="#FFFFFF"
-                     android:lineSpacingExtra="2dp"
-                     android:fontFamily="sans-serif"
                      android:maxLines="2"
                      android:layout_weight="1"
                      android:id="@+id/videoTitle"
-                     android:text="VideoTittle"
-                     android:textStyle="normal" />
+                     android:text="VideoTitle" />
 
                 <ImageButton
                      android:layout_height="32dp"
@@ -191,15 +157,13 @@
             <LinearLayout
                  android:layout_height="wrap_content"
                  android:layout_width="match_parent"
-                 android:layout_marginBottom="16dp"
                  android:gravity="center_vertical"
                  android:orientation="horizontal">
 
                 <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:textSize="14sp"
-                     android:fontFamily="sans-serif-medium"
+                     android:textSize="13sp"
                      android:textColor="#AAAAAA"
                      android:id="@+id/viewCount"
                      android:text="2.2K views" />
@@ -213,27 +177,10 @@
                 <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:textSize="14sp"
+                     android:textSize="13sp"
                      android:textColor="#AAAAAA"
                      android:id="@+id/uploadTime"
                      android:text="5 hours ago" />
-
-                <View
-                     android:layout_height="1dp"
-                     android:layout_width="0dp"
-                     android:layout_weight="1" />
-
-                <TextView
-                     android:layout_height="wrap_content"
-                     android:layout_width="wrap_content"
-                     android:background="@drawable/text_button_background"
-                     android:paddingVertical="4dp"
-                     android:textSize="13sp"
-                     android:textColor="#AAAAAA"
-                     android:layout_marginStart="4dp"
-                     android:paddingHorizontal="8dp"
-                     android:id="@+id/moreHashtagsButton"
-                     android:text="...more" />
 
             </LinearLayout>
 
@@ -246,42 +193,37 @@
             <LinearLayout
                  android:layout_height="wrap_content"
                  android:layout_width="match_parent"
-                 android:background="#0F0F0F"
-                 android:gravity="center"
                  android:orientation="horizontal"
                  android:paddingBottom="16dp"
-                 android:paddingHorizontal="12dp">
+                 android:paddingHorizontal="16dp">
 
                 <LinearLayout
-                     android:layout_height="48dp"
-                     android:layout_width="0dp"
+                     android:layout_height="40dp"
+                     android:layout_width="120dp"
                      android:layout_marginEnd="8dp"
                      android:background="@drawable/combined_action_button_background"
-                     android:gravity="center"
-                     android:orientation="horizontal"
-                     android:layout_weight="2">
+                     android:orientation="horizontal">
 
                     <LinearLayout
                          android:layout_height="match_parent"
                          android:layout_width="0dp"
-                         android:gravity="center"
                          android:background="@drawable/like_button_background"
+                         android:gravity="center"
                          android:orientation="horizontal"
                          android:layout_weight="1"
                          android:id="@+id/likeButton">
 
                         <ImageView
-                             android:layout_height="20dp"
-                             android:layout_width="20dp"
+                             android:layout_height="18dp"
+                             android:layout_width="18dp"
+                             android:layout_marginEnd="4dp"
                              android:src="@drawable/ic_thumb_up_outline"
-                             android:layout_marginEnd="6dp"
                              app:tint="#FFFFFF" />
 
                         <TextView
                              android:layout_height="wrap_content"
                              android:layout_width="wrap_content"
-                             android:textSize="14sp"
-                             android:fontFamily="sans-serif-medium"
+                             android:textSize="12sp"
                              android:textColor="#FFFFFF"
                              android:id="@+id/likeCount"
                              android:text="460" />
@@ -289,20 +231,21 @@
                     </LinearLayout>
 
                     <View
-                         android:layout_height="24dp"
+                         android:layout_height="20dp"
                          android:layout_width="1dp"
-                         android:background="#333333" />
+                         android:background="#333333"
+                         android:layout_gravity="center_vertical" />
 
                     <LinearLayout
                          android:layout_height="match_parent"
-                         android:layout_width="48dp"
-                         android:gravity="center"
+                         android:layout_width="40dp"
                          android:background="@drawable/dislike_button_background"
+                         android:gravity="center"
                          android:id="@+id/dislikeButton">
 
                         <ImageView
-                             android:layout_height="20dp"
-                             android:layout_width="20dp"
+                             android:layout_height="18dp"
+                             android:layout_width="18dp"
                              android:src="@drawable/ic_thumb_down_outline"
                              app:tint="#FFFFFF" />
 
@@ -311,54 +254,51 @@
                 </LinearLayout>
 
                 <LinearLayout
-                     android:layout_height="48dp"
+                     android:layout_height="40dp"
                      android:layout_width="0dp"
                      android:layout_marginEnd="8dp"
-                     android:gravity="center"
                      android:background="@drawable/action_button_background"
+                     android:gravity="center"
                      android:orientation="horizontal"
-                     android:layout_weight="1.5"
+                     android:layout_weight="1"
                      android:id="@+id/shareButton">
 
                     <ImageView
-                         android:layout_height="20dp"
-                         android:layout_width="20dp"
+                         android:layout_height="18dp"
+                         android:layout_width="18dp"
+                         android:layout_marginEnd="4dp"
                          android:src="@drawable/ic_share_outline"
-                         android:layout_marginEnd="6dp"
                          app:tint="#FFFFFF" />
 
                     <TextView
                          android:layout_height="wrap_content"
                          android:layout_width="wrap_content"
                          android:textSize="12sp"
-                         android:fontFamily="sans-serif-medium"
                          android:textColor="#FFFFFF"
                          android:text="Share" />
 
                 </LinearLayout>
 
                 <LinearLayout
-                     android:layout_height="48dp"
+                     android:layout_height="40dp"
                      android:layout_width="0dp"
-                     android:layout_marginEnd="8dp"
-                     android:gravity="center"
                      android:background="@drawable/action_button_background"
+                     android:gravity="center"
                      android:orientation="horizontal"
-                     android:layout_weight="1.5"
+                     android:layout_weight="1"
                      android:id="@+id/downloadButton">
 
                     <ImageView
-                         android:layout_height="20dp"
-                         android:layout_width="20dp"
+                         android:layout_height="18dp"
+                         android:layout_width="18dp"
+                         android:layout_marginEnd="4dp"
                          android:src="@drawable/ic_download_outline"
-                         android:layout_marginEnd="6dp"
                          app:tint="#FFFFFF" />
 
                     <TextView
                          android:layout_height="wrap_content"
                          android:layout_width="wrap_content"
                          android:textSize="12sp"
-                         android:fontFamily="sans-serif-medium"
                          android:textColor="#FFFFFF"
                          android:text="Download" />
 
@@ -371,17 +311,16 @@
         <LinearLayout
              android:layout_height="wrap_content"
              android:layout_width="match_parent"
-             android:background="#0F0F0F"
              android:gravity="center_vertical"
-             android:paddingVertical="16dp"
+             android:paddingVertical="12dp"
              android:orientation="horizontal"
              android:paddingHorizontal="16dp">
 
             <de.hdodenhof.circleimageview.CircleImageView
-                 android:layout_height="48dp"
-                 android:layout_width="48dp"
-                 android:src="@drawable/default_channel_avatar"
+                 android:layout_height="40dp"
+                 android:layout_width="40dp"
                  android:layout_marginEnd="12dp"
+                 android:src="@drawable/default_channel_avatar"
                  android:id="@+id/channelAvatar" />
 
             <LinearLayout
@@ -390,36 +329,18 @@
                  android:orientation="vertical"
                  android:layout_weight="1">
 
-                <LinearLayout
+                <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:layout_marginBottom="2dp"
-                     android:gravity="center_vertical"
-                     android:orientation="horizontal">
-
-                    <TextView
-                         android:layout_height="wrap_content"
-                         android:layout_width="wrap_content"
-                         android:textSize="16sp"
-                         android:fontFamily="sans-serif-medium"
-                         android:textColor="#FFFFFF"
-                         android:id="@+id/channelName"
-                         android:text="channelName" />
-
-                    <ImageView
-                         android:layout_height="16dp"
-                         android:layout_width="16dp"
-                         android:visibility="gone"
-                         android:src="@drawable/ic_verified"
-                         app:tint="#FFFFFF"
-                         android:layout_marginStart="6dp" />
-
-                </LinearLayout>
+                     android:textSize="14sp"
+                     android:textColor="#FFFFFF"
+                     android:id="@+id/channelName"
+                     android:text="channelName" />
 
                 <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:textSize="13sp"
+                     android:textSize="12sp"
                      android:textColor="#AAAAAA"
                      android:id="@+id/subscriberCount"
                      android:text="45.5K subscribers" />
@@ -427,12 +348,10 @@
             </LinearLayout>
 
             <Button
-                 android:layout_height="36dp"
+                 android:layout_height="32dp"
                  android:layout_width="wrap_content"
-                 android:layout_marginEnd="8dp"
                  android:background="@drawable/subscribe_button_background"
-                 android:textSize="14sp"
-                 android:fontFamily="sans-serif-medium"
+                 android:textSize="12sp"
                  android:textAllCaps="false"
                  android:textColor="#000000"
                  android:paddingHorizontal="16dp"
@@ -444,47 +363,31 @@
         <LinearLayout
              android:layout_height="wrap_content"
              android:layout_width="match_parent"
-             android:background="#0F0F0F"
+             android:paddingVertical="12dp"
              android:orientation="vertical"
-             android:layout_marginTop="8dp">
+             android:paddingHorizontal="16dp">
 
             <LinearLayout
                  android:layout_height="wrap_content"
                  android:layout_width="match_parent"
+                 android:layout_marginBottom="12dp"
                  android:gravity="center_vertical"
-                 android:paddingVertical="12dp"
-                 android:orientation="horizontal"
-                 android:paddingHorizontal="16dp">
+                 android:orientation="horizontal">
 
                 <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:textSize="18sp"
-                     android:fontFamily="sans-serif-medium"
+                     android:textSize="16sp"
                      android:textColor="#FFFFFF"
                      android:text="Comments" />
 
                 <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:textSize="16sp"
-                     android:fontFamily="sans-serif-medium"
+                     android:textSize="14sp"
                      android:textColor="#AAAAAA"
                      android:id="@+id/commentCount"
                      android:text=" 97" />
-
-                <View
-                     android:layout_height="1dp"
-                     android:layout_width="0dp"
-                     android:layout_weight="1" />
-
-                <LinearLayout
-                     android:layout_height="wrap_content"
-                     android:layout_width="wrap_content"
-                     android:gravity="center_vertical"
-                     android:orientation="horizontal">
-
-                </LinearLayout>
 
             </LinearLayout>
 
@@ -492,76 +395,26 @@
                  android:layout_height="wrap_content"
                  android:layout_width="match_parent"
                  android:gravity="center_vertical"
-                 android:background="@drawable/comment_input_section_background"
-                 android:orientation="horizontal"
-                 android:paddingBottom="16dp"
-                 android:paddingHorizontal="16dp">
+                 android:orientation="horizontal">
 
                 <de.hdodenhof.circleimageview.CircleImageView
-                     android:layout_height="36dp"
-                     android:layout_width="36dp"
-                     android:src="@drawable/default_user_avatar"
+                     android:layout_height="32dp"
+                     android:layout_width="32dp"
                      android:layout_marginEnd="12dp"
+                     android:src="@drawable/default_user_avatar"
                      android:id="@+id/userAvatar" />
 
-                <LinearLayout
-                     android:layout_height="wrap_content"
+                <EditText
+                     android:layout_height="40dp"
                      android:layout_width="0dp"
-                     android:orientation="vertical"
-                     android:layout_weight="1">
-
-                    <EditText
-                         android:layout_height="wrap_content"
-                         android:layout_width="match_parent"
-                         android:textSize="14sp"
-                         android:textColor="#FFFFFF"
-                         android:scrollbars="vertical"
-                         android:background="@drawable/comment_input_field_background"
-                         android:gravity="top"
-                         android:hint="Add a comment..."
-                         android:minHeight="44dp"
-                         android:paddingVertical="12dp"
-                         android:textColorHint="#666666"
-                         android:paddingHorizontal="16dp"
-                         android:maxLines="4"
-                         android:inputType="textMultiLine|textCapSentences"
-                         android:id="@+id/commentEditText" />
-
-                    <LinearLayout
-                         android:layout_height="wrap_content"
-                         android:layout_width="match_parent"
-                         android:visibility="gone"
-                         android:gravity="end"
-                         android:orientation="horizontal"
-                         android:id="@+id/commentActionsLayout"
-                         android:paddingTop="8dp">
-
-                        <Button
-                             android:layout_height="36dp"
-                             android:layout_width="wrap_content"
-                             android:layout_marginEnd="8dp"
-                             android:background="@drawable/cancel_button_background"
-                             android:textSize="14sp"
-                             android:textAllCaps="false"
-                             android:textColor="#FFFFFF"
-                             android:paddingHorizontal="16dp"
-                             android:id="@+id/cancelCommentButton"
-                             android:text="Cancel" />
-
-                        <Button
-                             android:layout_height="36dp"
-                             android:layout_width="wrap_content"
-                             android:background="@drawable/submit_comment_button_background"
-                             android:textSize="14sp"
-                             android:textAllCaps="false"
-                             android:textColor="#000000"
-                             android:paddingHorizontal="16dp"
-                             android:id="@+id/submitCommentButton"
-                             android:text="Comment" />
-
-                    </LinearLayout>
-
-                </LinearLayout>
+                     android:background="@drawable/comment_input_field_background"
+                     android:hint="Add a comment..."
+                     android:textColorHint="#666666"
+                     android:textSize="13sp"
+                     android:textColor="#FFFFFF"
+                     android:paddingHorizontal="12dp"
+                     android:layout_weight="1"
+                     android:id="@+id/commentEditText" />
 
             </LinearLayout>
 
@@ -570,58 +423,44 @@
         <LinearLayout
              android:layout_height="wrap_content"
              android:layout_width="match_parent"
-             android:background="#0F0F0F"
              android:orientation="vertical"
-             android:layout_marginTop="16dp"
-             android:paddingTop="16dp">
+             android:paddingHorizontal="16dp"
+             android:paddingTop="12dp">
 
             <LinearLayout
                  android:layout_height="wrap_content"
                  android:layout_width="match_parent"
+                 android:layout_marginBottom="12dp"
                  android:gravity="center_vertical"
-                 android:orientation="horizontal"
-                 android:paddingBottom="12dp"
-                 android:paddingHorizontal="16dp">
+                 android:orientation="horizontal">
 
                 <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:textSize="18sp"
-                     android:fontFamily="sans-serif-medium"
+                     android:textSize="16sp"
                      android:textColor="#FFFFFF"
                      android:text="Up next" />
 
-                <View
+                <Space
                      android:layout_height="1dp"
                      android:layout_width="0dp"
                      android:layout_weight="1" />
 
-                <LinearLayout
+                <TextView
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
-                     android:gravity="center_vertical"
-                     android:background="@drawable/autoplay_toggle_background"
-                     android:paddingVertical="6dp"
-                     android:orientation="horizontal"
-                     android:paddingHorizontal="12dp">
+                     android:layout_marginEnd="8dp"
+                     android:textSize="12sp"
+                     android:textColor="#AAAAAA"
+                     android:text="Autoplay" />
 
-                    <TextView
-                         android:layout_height="wrap_content"
-                         android:layout_width="wrap_content"
-                         android:layout_marginEnd="8dp"
-                         android:textSize="13sp"
-                         android:textColor="#AAAAAA"
-                         android:text="Autoplay" />
-
-                    <Switch
-                         android:layout_height="wrap_content"
-                         android:layout_width="wrap_content"
-                         android:trackTint="#666666"
-                         android:thumbTint="#FFFFFF"
-                         android:checked="true"
-                         android:id="@+id/autoplaySwitch" />
-
-                </LinearLayout>
+                <Switch
+                     android:layout_height="wrap_content"
+                     android:layout_width="wrap_content"
+                     android:trackTint="#666666"
+                     android:thumbTint="#FFFFFF"
+                     android:checked="true"
+                     android:id="@+id/autoplaySwitch" />
 
             </LinearLayout>
 
@@ -629,7 +468,6 @@
                  android:layout_height="wrap_content"
                  android:layout_width="match_parent"
                  android:paddingBottom="16dp"
-                 android:clipToPadding="false"
                  android:nestedScrollingEnabled="false"
                  android:id="@+id/upNextRecyclerView" />
 

@@ -15,6 +15,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.nidoham.flowtube.PlayerActivity;
 import com.nidoham.flowtube.adapter.VideoAdapter;
 import com.nidoham.flowtube.databinding.FragmentTrendingBinding;
 import com.nidoham.flowtube.helper.SearchManager;
@@ -197,7 +198,8 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         }
 
         try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(videoItem.getUrl()));
+            Intent intent = new Intent(getContext(), PlayerActivity.class);
+            intent.putExtra("video_url", videoItem.getUrl());
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         } catch (Exception e) {

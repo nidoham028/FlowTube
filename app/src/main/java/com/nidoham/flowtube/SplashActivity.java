@@ -24,7 +24,7 @@ public class SplashActivity extends AppCompatActivity {
         binding = ActivitySplashBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         
-        if(false) {
+        if(true) {
         	navigateToNextScreen();
         } else {
         	Intent intent = new Intent(SplashActivity.this, PlayerActivity.class);
