@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Landscape Layout - Video Player Only -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_height="match_parent"
+    android:layout_width="match_parent"
+    android:background="#000000"
+    android:fitsSystemWindows="false">
+
+    <!-- Full Screen Video Player -->
+    <com.google.android.exoplayer2.ui.PlayerView
+        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        app:use_controller="false"
+        app:resize_mode="fit"
+        android:id="@+id/exoPlayerView" />
+
+    <!-- Video Controls Overlay - Optimized for landscape -->
+    <RelativeLayout
+        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        android:background="@drawable/video_overlay_gradient"
+        android:id="@+id/videoControlsOverlay">
+
+        <!-- Top Controls Bar - New for landscape -->
+        <LinearLayout
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:layout_alignParentTop="true"
+            android:orientation="horizontal"
+            android:padding="16dp"
+            android:gravity="center_vertical"
+            android:id="@+id/topControls">
+
+            <!-- Back/Exit Fullscreen Button -->
+            <ImageButton
+                android:layout_height="40dp"
+                android:layout_width="40dp"
+                android:src="@drawable/ic_arrow_back"
+                android:background="@drawable/control_button_background"
+                app:tint="#FFFFFF"
+                android:contentDescription="Exit fullscreen"
+                android:id="@+id/exitFullscreenButton" />
+
+            <Space
+                android:layout_height="1dp"
+                android:layout_width="0dp"
+                android:layout_weight="1" />
+
+            <!-- Video Title in Landscape -->
+            <TextView
+                android:layout_height="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="3"
+                android:textSize="16sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:id="@+id/landscapeVideoTitle"
+                android:text="Video Title" />
+
+            <Space
+                android:layout_height="1dp"
+                android:layout_width="0dp"
+                android:layout_weight="1" />
+
+            <!-- More Options Button -->
+            <ImageButton
+                android:layout_height="40dp"
+                android:layout_width="40dp"
+                android:src="@drawable/ic_more_vert"
+                android:background="@drawable/control_button_background"
+                app:tint="#FFFFFF"
+                android:contentDescription="More options"
+                android:id="@+id/moreOptionsButton" />
+
+        </LinearLayout>
+
+        <!-- Center Play Controls - Larger for landscape -->
+        <LinearLayout
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_centerInParent="true"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_height="64dp"
+                android:layout_width="64dp"
+                android:layout_marginEnd="60dp"
+                android:src="@drawable/ic_skip_previous"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="16dp"
+                app:tint="#FFFFFF"
+                android:contentDescription="Previous video"
+                android:id="@+id/previousButton" />
+
+            <ImageView
+                android:layout_height="80dp"
+                android:layout_width="80dp"
+                android:src="@drawable/ic_play_circle_filled"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="8dp"
+                app:tint="#FFFFFF"
+                android:contentDescription="Play/Pause"
+                android:id="@+id/centerPlayButton" />
+
+            <ImageView
+                android:layout_height="64dp"
+                android:layout_width="64dp"
+                android:src="@drawable/ic_skip_next"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="16dp"
+                app:tint="#FFFFFF"
+                android:layout_marginStart="60dp"
+                android:contentDescription="Next video"
+                android:id="@+id/nextButton" />
+
+        </LinearLayout>
+
+        <!-- Bottom Controls - Enhanced for landscape -->
+        <LinearLayout
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:background="@android:color/transparent"
+            android:padding="20dp"
+            android:orientation="vertical"
+            android:layout_alignParentBottom="true"
+            android:id="@+id/bottomControls">
+
+            <!-- Enhanced SeekBar for landscape -->
+            <SeekBar
+                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:layout_marginBottom="16dp"
+                android:progressBackgroundTint="#40FFFFFF"
+                android:thumbTint="#FF0000"
+                android:progressTint="#FF0000"
+                android:secondaryProgressTint="#80FF0000"
+                android:minHeight="6dp"
+                android:id="@+id/seekBar" />
+
+            <!-- Control Row - Optimized for landscape -->
+            <LinearLayout
+                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:gravity="center_vertical">
+
+                <!-- Time Display -->
+                <TextView
+                    android:layout_height="wrap_content"
+                    android:layout_width="wrap_content"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="monospace"
+                    android:textStyle="bold"
+                    android:id="@+id/timeDisplay"
+                    android:text="0:10 / 2:29:35" />
+
+                <Space
+                    android:layout_height="1dp"
+                    android:layout_width="0dp"
+                    android:layout_weight="1" />
+
+                <!-- Playback Speed Button -->
+                <Button
+                    android:layout_height="40dp"
+                    android:layout_width="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/control_button_background"
+                    android:textSize="12sp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:paddingHorizontal="12dp"
+                    android:minWidth="60dp"
+                    android:id="@+id/playbackSpeedButton"
+                    android:text="1x" />
+
+                <!-- Quality Button -->
+                <Button
+                    android:layout_height="40dp"
+                    android:layout_width="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/control_button_background"
+                    android:textSize="12sp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:paddingHorizontal="12dp"
+                    android:minWidth="60dp"
+                    android:id="@+id/qualityButton"
+                    android:text="720p" />
+
+                <!-- Captions Button -->
+                <ImageButton
+                    android:layout_height="40dp"
+                    android:layout_width="40dp"
+                    android:layout_marginEnd="12dp"
+                    android:src="@drawable/ic_close"
+                    android:background="@drawable/control_button_background"
+                    app:tint="#FFFFFF"
+                    android:contentDescription="Captions"
+                    android:id="@+id/captionsButton" />
+
+                <!-- Settings Button -->
+                <ImageButton
+                    android:layout_height="40dp"
+                    android:layout_width="40dp"
+                    android:layout_marginEnd="12dp"
+                    android:src="@drawable/ic_settings"
+                    android:background="@drawable/control_button_background"
+                    app:tint="#FFFFFF"
+                    android:contentDescription="Settings"
+                    android:id="@+id/settingsButton" />
+
+                <!-- Exit Fullscreen Button -->
+                <ImageButton
+                    android:layout_height="40dp"
+                    android:layout_width="40dp"
+                    android:src="@drawable/ic_fullscreen_exit"
+                    android:background="@drawable/control_button_background"
+                    app:tint="#FFFFFF"
+                    android:contentDescription="Exit fullscreen"
+                    android:id="@+id/fullscreenButton" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Side Controls - New for landscape (optional) -->
+        <LinearLayout
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="20dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:id="@+id/sideControls">
+
+            <!-- Like Button -->
+            <ImageButton
+                android:layout_height="48dp"
+                android:layout_width="48dp"
+                android:layout_marginBottom="16dp"
+                android:src="@drawable/ic_thumb_up_outline"
+                android:background="@drawable/control_button_background"
+                app:tint="#FFFFFF"
+                android:contentDescription="Like"
+                android:id="@+id/landscapeLikeButton" />
+
+            <!-- Share Button -->
+            <ImageButton
+                android:layout_height="48dp"
+                android:layout_width="48dp"
+                android:layout_marginBottom="16dp"
+                android:src="@drawable/ic_share_outline"
+                android:background="@drawable/control_button_background"
+                app:tint="#FFFFFF"
+                android:contentDescription="Share"
+                android:id="@+id/landscapeShareButton" />
+
+            <!-- Save Button -->
+            <ImageButton
+                android:layout_height="48dp"
+                android:layout_width="48dp"
+                android:src="@drawable/ic_bookmark"
+                android:background="@drawable/control_button_background"
+                app:tint="#FFFFFF"
+                android:contentDescription="Save"
+                android:id="@+id/landscapeSaveButton" />
+
+        </LinearLayout>
+
+    </RelativeLayout>
+
+    <!-- Loading Indicator -->
+    <ProgressBar
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:visibility="gone"
+        android:indeterminateTint="#FF0000"
+        android:id="@+id/progressBar"
+        android:layout_gravity="center" />
+
+    <!-- Hidden Elements (All video details, comments, etc. are not included in landscape) -->
+    <!-- Video Details Container - HIDDEN in landscape -->
+    <LinearLayout
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:id="@+id/videoDetailsContainer">
+        <!-- All video details content hidden in landscape mode -->
+    </LinearLayout>
+
+</FrameLayout>
