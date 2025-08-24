@@ -24,12 +24,18 @@ public class SplashActivity extends AppCompatActivity {
         binding = ActivitySplashBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         
-        navigateToNextScreen();
+        if(false) {
+        	navigateToNextScreen();
+        } else {
+        	Intent intent = new Intent(SplashActivity.this, PlayerActivity.class);
+            startActivity(intent);
+        }
     }
 	
 	@Deprecated
     private void navigateToNextScreen() {
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            
             Intent intent = new Intent(SplashActivity.this, MainActivity.class);
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
