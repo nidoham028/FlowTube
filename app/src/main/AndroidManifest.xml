@@ -20,5 +20,9 @@
 		<activity
     		android:name=".MainActivity"
     		android:exported="true"/>
+            
+        <activity
+            android:name="org.schabi.newpipe.error.ReCaptchaActivity"
+            android:exported="false"/>
     </application>
 </manifest>

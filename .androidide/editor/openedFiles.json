@@ -1,0 +1,20 @@
+{
+  "allFiles": [
+    {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/fragment/HomeFragment.java",
+      "selection": {
+        "end": {
+          "column": 45,
+          "index": 1869,
+          "line": 58
+        },
+        "start": {
+          "column": 45,
+          "index": 1869,
+          "line": 58
+        }
+      }
+    }
+  ],
+  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/fragment/HomeFragment.java"
+}

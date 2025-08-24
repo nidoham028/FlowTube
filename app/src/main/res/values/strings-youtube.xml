@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="youtube_restricted_mode_enabled">youtube_restricted_mode_enabled</string>
+    <string name="recaptcha_cookies_key">recaptcha_cookies</string>
+    <string name="show_meta_info_key">show_meta_info</string>
+</resources>

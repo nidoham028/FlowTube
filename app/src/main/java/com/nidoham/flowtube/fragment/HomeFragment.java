@@ -21,14 +21,13 @@ public class HomeFragment extends Fragment {
     private HomePagerAdapter pagerAdapter;
     private TabLayoutMediator tabLayoutMediator;
     
-    // Tab icons array for icon-based tabs
-    private final int[] tabIcons = {
-        R.drawable.ic_feed,        // Feed
-        R.drawable.ic_trending,    // Trending
-        R.drawable.ic_favorite,    // Favorite
-        R.drawable.ic_music,       // Music
-        R.drawable.ic_live,        // Live
-        R.drawable.ic_games        // Games
+    // Tab titles array for text-based tabs
+    private final String[] tabTitles = {
+        "Feed",        // Feed
+        "Trending",    // Trending
+        "Music",       // Music
+        "Live",        // Live
+        "Games"        // Games
     };
     
     public HomeFragment() {
@@ -57,13 +56,14 @@ public class HomeFragment extends Fragment {
     private void setupViewPager() {
         pagerAdapter = new HomePagerAdapter(this);
         viewPager.setAdapter(pagerAdapter);
+        viewPager.setUserInputEnabled(false);
     }
     
     private void setupTabLayout() {
         tabLayoutMediator = new TabLayoutMediator(tabLayout, viewPager,
             (tab, position) -> {
-                if (position < tabIcons.length) {
-                    tab.setIcon(tabIcons[position]);
+                if (position < tabTitles.length) {
+                    tab.setText(tabTitles[position]);
                 }
             });
         tabLayoutMediator.attach();
@@ -94,12 +94,10 @@ public class HomeFragment extends Fragment {
                 case 1:
                     return new TrendingFragment();
                 case 2:
-                    return new FeedFragment(); // Favorite (reusing FeedFragment)
-                case 3:
                     return new FeedFragment(); // Music (reusing FeedFragment)
-                case 4:
+                case 3:
                     return new FeedFragment(); // Live (reusing FeedFragment)
-                case 5:
+                case 4:
                     return new FeedFragment(); // Games (reusing FeedFragment)
                 default:
                     return new FeedFragment(); // Default fallback
@@ -108,7 +106,7 @@ public class HomeFragment extends Fragment {
         
         @Override
         public int getItemCount() {
-            return 6; // 6 tabs with icons
+            return 5; // 5 tabs with titles
         }
     }
 }

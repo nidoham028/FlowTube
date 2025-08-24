@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Plurals -->
+    <plurals name="views">
+        <item quantity="one">%s view</item>
+        <item quantity="other">%s views</item>
+    </plurals>
+    
+    <plurals name="videos">
+        <item quantity="one">%s video</item>
+        <item quantity="other">%s videos</item>
+    </plurals>
+    
+    <plurals name="subscribers">
+        <item quantity="one">%s subscriber</item>
+        <item quantity="other">%s subscribers</item>
+    </plurals>
+    
+    <plurals name="watching">
+        <item quantity="one">%s watching</item>
+        <item quantity="other">%s watching</item>
+    </plurals>
+    
+    <plurals name="listening">
+        <item quantity="one">%s listening</item>
+        <item quantity="other">%s listening</item>
+    </plurals>
+    
+    <plurals name="replies">
+        <item quantity="one">%s reply</item>
+        <item quantity="other">%s replies</item>
+    </plurals>
+    
+    <plurals name="download_finished_notification">
+        <item quantity="one">%s download finished</item>
+        <item quantity="other">%s downloads finished</item>
+    </plurals>
+    
+    <plurals name="deleted_downloads_toast">
+        <item quantity="one">%s download deleted</item>
+        <item quantity="other">%s downloads deleted</item>
+    </plurals>
+    
+    <!-- Time units -->
+    <plurals name="seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+    
+    <plurals name="minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    
+    <plurals name="hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    
+    <plurals name="days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+</resources>

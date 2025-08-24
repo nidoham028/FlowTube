@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:layout_height="match_parent"
+     android:layout_width="match_parent"
+     android:background="@color/md_theme_background"
+     android:padding="16dp"
+     android:orientation="vertical">
+
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:layout_marginBottom="16dp"
+         android:gravity="center"
+         android:background="#ffebee"
+         android:padding="16dp"
+         android:textSize="20sp"
+         android:textColor="#d32f2f"
+         android:text="SkyMate - Crash Report"
+         android:textStyle="bold" />
+
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:layout_marginBottom="16dp"
+         android:textSize="14sp"
+         android:text="The application encountered an error. Please copy the error details below and report it to the developers." />
+
+    <ScrollView
+         android:layout_height="0dp"
+         android:layout_width="match_parent"
+         android:layout_marginBottom="16dp"
+         android:background="#ffffff"
+         android:padding="8dp"
+         android:layout_weight="1">
+
+        <TextView
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:textSize="12sp"
+             android:fontFamily="monospace"
+             android:textColor="#333"
+             android:textIsSelectable="true"
+             android:id="@+id/debug_text"
+             android:text="Loading error details..." />
+
+    </ScrollView>
+
+    <LinearLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:orientation="vertical"
+         android:layout_marginTop="8dp">
+
+        <Button
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:layout_marginBottom="8dp"
+             android:background="#4caf50"
+             android:padding="12dp"
+             android:textColor="#ffffff"
+             android:id="@+id/btn_copy"
+             android:text="Copy Error Log" />
+
+        <Button
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:layout_marginBottom="8dp"
+             android:background="#2196f3"
+             android:padding="12dp"
+             android:textColor="#ffffff"
+             android:id="@+id/btn_restart"
+             android:text="Restart Application" />
+
+        <Button
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:background="#f44336"
+             android:padding="12dp"
+             android:textColor="#ffffff"
+             android:id="@+id/btn_close"
+             android:text="Close" />
+
+    </LinearLayout>
+
+</LinearLayout>
