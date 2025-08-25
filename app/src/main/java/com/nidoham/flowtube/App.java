@@ -14,6 +14,7 @@ import androidx.preference.PreferenceManager;
 
 import com.nidoham.strivo.settings.ApplicationSettings;
 import com.nidoham.flowtube.core.language.AppLanguage;
+import org.acra.ACRA;
 import org.schabi.newpipe.error.ReCaptchaActivity;
 import com.nidoham.strivo.Localization.Localizations;
 import org.schabi.newpipe.extractor.NewPipe;
@@ -47,6 +48,7 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        ACRA.init(this);
         
         // Store the default exception handler before setting our custom one
         defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();

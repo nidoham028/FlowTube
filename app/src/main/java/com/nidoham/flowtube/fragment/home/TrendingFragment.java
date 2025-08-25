@@ -567,9 +567,6 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
                     errorMessage = "Verification required. Try again later.";
                     shouldRetry = true;
                     break;
-                case COMPATIBILITY_ERROR:
-                    errorMessage = "Device compatibility issue. Please update the app.";
-                    break;
                 default:
                     errorMessage = "Failed to load videos";
                     shouldRetry = true;
