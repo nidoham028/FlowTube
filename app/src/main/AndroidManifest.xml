@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- Storage Permissions for caching -->
+    <!-- Storage Permissions (legacy) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"
         tools:ignore="ScopedStorage" />
@@ -14,74 +14,82 @@
     <!-- Wake Lock for background operations -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
-    <!-- Foreground Service for background tasks -->
+    <!-- Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    
+
+    <!-- Required for TV devices -->
+    <uses-feature android:name="android.software.leanback" android:required="true" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.faketouch" android:required="false" />
+
     <application
         android:name=".App"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
+        android:resizeableActivity="true"
         android:usesCleartextTraffic="false"
+        android:banner="@drawable/app_banner"
         tools:targetApi="31">
 
-        <!-- Splash Activity (Main Launcher) -->
+        <!-- Splash Activity -->
         <activity
             android:name=".SplashActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
+            android:screenOrientation="sensor"
+            android:resizeableActivity="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Main Application Activity -->
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustPan">
-            
-            <!-- Deep Link Support for YouTube URLs -->
+            android:screenOrientation="sensor"
+            android:windowSoftInputMode="adjustPan"
+            android:resizeableActivity="true">
+
+            <!-- Deep Link Support -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https"
-                    android:host="www.youtube.com" />
-                <data android:scheme="https"
-                    android:host="youtube.com" />
-                <data android:scheme="https"
-                    android:host="youtu.be" />
+                <data android:scheme="https" android:host="www.youtube.com" />
+                <data android:scheme="https" android:host="youtube.com" />
+                <data android:scheme="https" android:host="youtu.be" />
             </intent-filter>
-            
-            <!-- Share Intent Support -->
+
+            <!-- Share Intent -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            
         </activity>
 
+        <!-- Player Activity -->
         <activity
-            android:name="PlayerActivity"
-            android:exported="false"/>
+            android:name=".PlayerActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:screenOrientation="sensor" />
 
-        <!-- NewPipe ReCaptcha Activity -->
+        <!-- NewPipe ReCaptcha -->
         <activity
             android:name="org.schabi.newpipe.error.ReCaptchaActivity"
             android:exported="false"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true" />
 
-        <!-- Debug Activity for Crash Handling -->
+        <!-- Debug Activity -->
         <activity
             android:name=".DebugActivity"
             android:exported="false"
@@ -92,7 +100,7 @@
             android:finishOnTaskLaunch="false"
             android:clearTaskOnLaunch="false" />
 
-        <!-- File Provider for sharing content -->
+        <!-- File Provider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -103,25 +111,11 @@
                 android:resource="@xml/provider_paths" />
         </provider>
 
-        <!-- Disable automatic backup for sensitive data -->
-        <meta-data
-            android:name="com.google.android.backup.api_key"
-            android:value="backup_key_placeholder" />
-
     </application>
 
-    <!-- Hardware Features -->
-    <uses-feature
-        android:name="android.hardware.camera"
-        android:required="false" />
-    
-    <uses-feature
-        android:name="android.hardware.microphone"
-        android:required="false" />
-
-    <!-- Network Security Requirements -->
-    <uses-feature
-        android:name="android.software.webview"
-        android:required="true" />
+    <!-- Optional Features -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.software.webview" android:required="true" />
 
 </manifest>

@@ -9,7 +9,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.widget.SeekBar;
@@ -20,547 +19,1359 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.DefaultLifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.util.Util;
 import com.nidoham.flowtube.databinding.ActivityPlayerBinding;
 
 import org.schabi.newpipe.extractor.ServiceList;
-import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 
+import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Formatter;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
-public class PlayerActivity extends AppCompatActivity implements Player.Listener {
+/**
+ * Professional video player activity implementing comprehensive view binding,
+ * lifecycle management, orientation handling, thread safety, and optimal user experience.
+ * 
+ * Features:
+ * - Complete lifecycle management with proper state persistence
+ * - Thread-safe operations with atomic references
+ * - Enhanced error handling and recovery mechanisms
+ * - Optimized memory management and resource cleanup
+ * - Comprehensive orientation and configuration change handling
+ * - Accessibility support and user experience enhancements
+ * - Performance optimizations and background processing
+ */
+public class PlayerActivity extends AppCompatActivity implements Player.Listener, DefaultLifecycleObserver {
 
     private static final String TAG = "PlayerActivity";
-    
-    // Intent extras
+
+    // Intent Extras
     public static final String EXTRA_VIDEO_URL = "video_url";
     public static final String EXTRA_VIDEO_TITLE = "video_title";
     public static final String EXTRA_CHANNEL_NAME = "channel_name";
-    
-    // UI constants
-    private static final int CONTROLS_HIDE_DELAY_MS = 2000; // 2 seconds as requested
-    private static final int PROGRESS_UPDATE_INTERVAL_MS = 500; // Faster updates for live streams
+
+    // UI & Timing Constants
+    private static final int CONTROLS_HIDE_DELAY_MS = 3000;
+    private static final int PROGRESS_UPDATE_INTERVAL_MS = 500;
     private static final int SEEK_INCREMENT_MS = 10000;
-    
-    // Time constants
-    private static final long MILLISECONDS_IN_SECOND = 1000;
-    private static final long SECONDS_IN_MINUTE = 60;
-    private static final long MINUTES_IN_HOUR = 60;
-    private static final long HOURS_IN_DAY = 24;
-    private static final long DAYS_IN_WEEK = 7;
-    private static final long DAYS_IN_MONTH = 30;
-    private static final long DAYS_IN_YEAR = 365;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final int RETRY_DELAY_MS = 2000;
 
-    // Core components
-    private ActivityPlayerBinding binding;
-    private ExoPlayer player;
-    private StreamExtractor streamExtractor;
+    // State Bundle Keys
+    private static final String STATE_PLAYER_STATE = "player_state";
+    private static final String STATE_VIDEO_METADATA = "video_metadata";
+    private static final String STATE_UI_STATE = "ui_state";
+    private static final String STATE_ERROR_STATE = "error_state";
+
+    // Core Components - Thread Safe References
+    private volatile ActivityPlayerBinding binding;
+    private final AtomicReference<ExoPlayer> playerRef = new AtomicReference<>();
+    private final AtomicReference<StreamExtractor> streamExtractorRef = new AtomicReference<>();
+    private final AtomicReference<ExecutorService> backgroundExecutorRef = new AtomicReference<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private ExecutorService backgroundExecutor;
 
-    // Playback state
-    private long playbackPosition = 0;
-    private boolean playWhenReady = true;
-    private boolean isFullscreen = false;
-    private boolean controlsVisible = false;
-    private boolean isLiveStream = false;
-    private boolean isVideoLoaded = false;
-    
-    // Video metadata (preserved across orientation changes)
-    private String videoTitle;
-    private String channelName;
-    private String videoMetadata;
-    private String likeCount;
-    
-    // UI runnables
+    // State Management - Thread Safe
+    private final AtomicReference<PlayerState> playerStateRef = new AtomicReference<>();
+    private final AtomicReference<VideoMetadata> videoMetadataRef = new AtomicReference<>();
+    private final AtomicReference<UIController> uiControllerRef = new AtomicReference<>();
+    private final AtomicReference<ErrorRecoveryManager> errorRecoveryRef = new AtomicReference<>();
+
+    // Thread Safety Flags
+    private final AtomicBoolean isInitialized = new AtomicBoolean(false);
+    private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
+    private final AtomicBoolean isConfigurationChanging = new AtomicBoolean(false);
+
+    // UI Runnables
     private final Runnable hideControlsRunnable = this::hideControlsInternal;
-    private final Runnable updateProgressRunnable = new Runnable() {
-        @Override
-        public void run() {
-            updateProgress();
-            if (player != null && !isFinishing()) {
-                mainHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS);
+    private final Runnable updateProgressRunnable = this::updateProgress;
+    private final Runnable overlayHideRunnable = this::hideControlsInternal;
+    private final AtomicReference<Future<?>> currentLoadingTask = new AtomicReference<>();
+
+    private final AtomicBoolean isUserSeeking = new AtomicBoolean(false);
+    
+    private static String videosUrl = "Unknown";
+
+    /**
+     * Enhanced player state with comprehensive serialization support
+     * and thread-safe operations for configuration changes and process restoration.
+     */
+    public static class PlayerState implements Serializable {
+        private static final long serialVersionUID = 1L;
+        
+        private volatile boolean isFullscreen = false;
+        private volatile boolean controlsVisible = false;
+        private volatile boolean isVideoLoaded = false;
+        private volatile long playbackPosition = 0;
+        private volatile boolean playWhenReady = true;
+        private volatile int playbackState = Player.STATE_IDLE;
+        private volatile boolean isBuffering = false;
+        private volatile int retryCount = 0;
+        private volatile long lastErrorTime = 0;
+        private volatile String lastErrorMessage = "";
+
+        public Bundle toBundle() {
+            Bundle bundle = new Bundle();
+            synchronized (this) {
+                bundle.putBoolean("isFullscreen", isFullscreen);
+                bundle.putBoolean("controlsVisible", controlsVisible);
+                bundle.putBoolean("isVideoLoaded", isVideoLoaded);
+                bundle.putLong("playbackPosition", Math.max(0, playbackPosition));
+                bundle.putBoolean("playWhenReady", playWhenReady);
+                bundle.putInt("playbackState", playbackState);
+                bundle.putBoolean("isBuffering", isBuffering);
+                bundle.putInt("retryCount", Math.max(0, retryCount));
+                bundle.putLong("lastErrorTime", lastErrorTime);
+                bundle.putString("lastErrorMessage", lastErrorMessage != null ? lastErrorMessage : "");
+            }
+            return bundle;
+        }
+
+        public void fromBundle(Bundle bundle) {
+            if (bundle != null) {
+                synchronized (this) {
+                    isFullscreen = bundle.getBoolean("isFullscreen", false);
+                    controlsVisible = bundle.getBoolean("controlsVisible", false);
+                    isVideoLoaded = bundle.getBoolean("isVideoLoaded", false);
+                    playbackPosition = Math.max(0, bundle.getLong("playbackPosition", 0));
+                    playWhenReady = bundle.getBoolean("playWhenReady", true);
+                    playbackState = bundle.getInt("playbackState", Player.STATE_IDLE);
+                    isBuffering = bundle.getBoolean("isBuffering", false);
+                    retryCount = Math.max(0, bundle.getInt("retryCount", 0));
+                    lastErrorTime = bundle.getLong("lastErrorTime", 0);
+                    lastErrorMessage = bundle.getString("lastErrorMessage", "");
+                }
             }
         }
-    };
+
+        public synchronized boolean isFullscreen() { return isFullscreen; }
+        public synchronized void setFullscreen(boolean fullscreen) { this.isFullscreen = fullscreen; }
+        
+        public synchronized boolean isControlsVisible() { return controlsVisible; }
+        public synchronized void setControlsVisible(boolean visible) { this.controlsVisible = visible; }
+        
+        public synchronized long getPlaybackPosition() { return playbackPosition; }
+        public synchronized void setPlaybackPosition(long position) { this.playbackPosition = Math.max(0, position); }
+        
+        public synchronized boolean shouldPlayWhenReady() { return playWhenReady; }
+        public synchronized void setPlayWhenReady(boolean play) { this.playWhenReady = play; }
+        
+        public synchronized int getRetryCount() { return retryCount; }
+        public synchronized void incrementRetryCount() { this.retryCount++; }
+        public synchronized void resetRetryCount() { this.retryCount = 0; }
+    }
+
+    /**
+     * Enhanced video metadata with comprehensive validation and thread safety
+     */
+    public static class VideoMetadata implements Serializable {
+        private static final long serialVersionUID = 1L;
+        
+        private volatile String videoUrl;
+        private volatile String videoTitle;
+        private volatile String channelName;
+        private volatile String videoInfo;
+        private volatile String likeCount;
+        private volatile boolean isLiveStream = false;
+        private volatile long duration = 0;
+        private volatile String thumbnailUrl;
+        private volatile String description;
+
+        public Bundle toBundle() {
+            Bundle bundle = new Bundle();
+            synchronized (this) {
+                bundle.putString("videoUrl", videoUrl != null ? videoUrl : "");
+                bundle.putString("videoTitle", videoTitle != null ? videoTitle : "");
+                bundle.putString("channelName", channelName != null ? channelName : "");
+                bundle.putString("videoInfo", videoInfo != null ? videoInfo : "");
+                bundle.putString("likeCount", likeCount != null ? likeCount : "");
+                bundle.putBoolean("isLiveStream", isLiveStream);
+                bundle.putLong("duration", Math.max(0, duration));
+                bundle.putString("thumbnailUrl", thumbnailUrl != null ? thumbnailUrl : "");
+                bundle.putString("description", description != null ? description : "");
+            }
+            return bundle;
+        }
+
+        public void fromBundle(Bundle bundle) {
+            if (bundle != null) {
+                synchronized (this) {
+                    videoUrl = bundle.getString("videoUrl", "");
+                    videoTitle = bundle.getString("videoTitle", "");
+                    channelName = bundle.getString("channelName", "");
+                    videoInfo = bundle.getString("videoInfo", "");
+                    likeCount = bundle.getString("likeCount", "");
+                    isLiveStream = bundle.getBoolean("isLiveStream", false);
+                    duration = Math.max(0, bundle.getLong("duration", 0));
+                    thumbnailUrl = bundle.getString("thumbnailUrl", "");
+                    description = bundle.getString("description", "");
+                    
+                    videosUrl = videoUrl;
+                }
+            }
+        }
+
+        public synchronized String getVideoUrl() { return videoUrl != null ? videoUrl : ""; }
+        public synchronized void setVideoUrl(String url) { this.videoUrl = url != null ? url.trim() : ""; }
+        
+        public synchronized String getVideoTitle() { return videoTitle != null ? videoTitle : "Untitled"; }
+        public synchronized void setVideoTitle(String title) { this.videoTitle = title != null ? title.trim() : "Untitled"; }
+        
+        public synchronized boolean isLiveStream() { return isLiveStream; }
+        public synchronized void setLiveStream(boolean liveStream) { this.isLiveStream = liveStream; }
+    }
+
+    /**
+     * Enhanced UI controller with comprehensive error handling and accessibility support
+     */
+    private class UIController {
+        private final AtomicBoolean isInitialized = new AtomicBoolean(false);
+        
+        public void initialize() {
+            if (isDestroyed.get() || binding == null) {
+                Log.w(TAG, "UIController initialization skipped - activity destroyed or binding null");
+                return;
+            }
+            
+            try {
+                setupSystemUI();
+                setupEventListeners();
+                setupBackPressHandler();
+                setupAccessibility();
+                isInitialized.set(true);
+                Log.d(TAG, "UIController initialized successfully");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialize UIController", e);
+                handleUIError("Failed to initialize UI", e);
+            }
+        }
+
+        private void setupEventListeners() {
+            if (binding == null) return;
+            
+            try {
+                // Main player view click
+                if (binding.playerView != null) {
+                    binding.playerView.setOnClickListener(v -> {
+                        if (!isDestroyed.get()) toggleOverlayVisibility();
+                    });
+                }
+                
+                // Control buttons with null checks
+                safeSetClickListener(binding.btnPlayPause, v -> togglePlayPause());
+                safeSetClickListener(binding.btnOrientation, v -> toggleOrientation());
+                safeSetClickListener(binding.btnBack, v -> handleBackPress());
+                safeSetClickListener(binding.btnReplay10, v -> seek(-SEEK_INCREMENT_MS));
+                safeSetClickListener(binding.btnForward10, v -> seek(SEEK_INCREMENT_MS));
+                safeSetClickListener(binding.btnCast, v -> showFeatureNotImplemented("Cast"));
+                safeSetClickListener(binding.btnCC, v -> showFeatureNotImplemented("Subtitles"));
+                safeSetClickListener(binding.btnSettings, v -> showFeatureNotImplemented("Settings"));
+
+                setupSeekBar();
+            } catch (Exception e) {
+                Log.e(TAG, "Error setting up event listeners", e);
+            }
+        }
+
+        private void safeSetClickListener(View view, View.OnClickListener listener) {
+            if (view != null && listener != null) {
+                view.setOnClickListener(listener);
+            }
+        }
+
+        private void setupSeekBar() {
+            if (binding == null || binding.videoProgress == null) return;
+            
+            binding.videoProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                private boolean wasPlaying;
+                private final AtomicBoolean isUserSeeking = new AtomicBoolean(false);
+                
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                    if (isDestroyed.get()) return;
+                    
+                    ExoPlayer player = playerRef.get();
+                    VideoMetadata metadata = videoMetadataRef.get();
+                    
+                    if (player != null && metadata != null && !metadata.isLiveStream()) {
+                        isUserSeeking.set(true);
+                        wasPlaying = player.isPlaying();
+                        player.pause();
+                        stopProgressUpdates();
+                    }
+                }
+
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    if (!fromUser || isDestroyed.get()) return;
+                    
+                    ExoPlayer player = playerRef.get();
+                    VideoMetadata metadata = videoMetadataRef.get();
+                    
+                    if (player != null && metadata != null && !metadata.isLiveStream()) {
+                        long duration = player.getDuration();
+                        if (duration > 0) {
+                            long position = (duration * progress) / 100;
+                            updateTimeDisplays(position, duration);
+                        }
+                    }
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                    if (isDestroyed.get()) return;
+                    
+                    ExoPlayer player = playerRef.get();
+                    VideoMetadata metadata = videoMetadataRef.get();
+                    
+                    if (player != null && metadata != null && !metadata.isLiveStream()) {
+                        try {
+                            long duration = player.getDuration();
+                            if (duration > 0) {
+                                long position = (duration * seekBar.getProgress()) / 100;
+                                player.seekTo(position);
+                            }
+                            if (wasPlaying) {
+                                player.play();
+                            }
+                            startProgressUpdates();
+                            resetOverlayTimer();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error during seek operation", e);
+                        } finally {
+                            isUserSeeking.set(false);
+                        }
+                    }
+                }
+            });
+        }
+
+        public void updateForOrientation() {
+            if (binding == null || isDestroyed.get()) return;
+            
+            try {
+                PlayerState state = playerStateRef.get();
+                if (state == null) return;
+                
+                boolean isLandscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+                state.setFullscreen(isLandscape);
+                
+                if (isLandscape) {
+                    hideSystemUI();
+                    hideVideoDetails();
+                } else {
+                    showSystemUI();
+                    showVideoDetails();
+                }
+                updateOrientationButtonIcon();
+                
+                Log.d(TAG, "Orientation updated - Fullscreen: " + isLandscape);
+            } catch (Exception e) {
+                Log.e(TAG, "Error updating orientation", e);
+            }
+        }
+
+        public void displayVideoMetadata() {
+            if (binding == null || isDestroyed.get()) return;
+            
+            VideoMetadata metadata = videoMetadataRef.get();
+            if (metadata == null) return;
+            
+            try {
+                runOnUiThread(() -> {
+                    if (binding == null || isDestroyed.get()) return;
+                    
+                    safeSetText(binding.txtTitle, metadata.getVideoTitle());
+                    safeSetText(binding.txtChannelName, metadata.channelName);
+                    safeSetText(binding.txtMeta, metadata.videoInfo);
+                    safeSetText(binding.txtLikeCount, metadata.likeCount);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error displaying video metadata", e);
+            }
+        }
+
+        private void safeSetText(android.widget.TextView textView, String text) {
+            if (textView != null && text != null) {
+                textView.setText(text);
+            }
+        }
+
+        private void setupAccessibility() {
+            if (binding == null) return;
+            
+            try {
+                // Set content descriptions for accessibility
+                if (binding.btnPlayPause != null) {
+                    binding.btnPlayPause.setContentDescription("Play or pause video");
+                }
+                if (binding.btnOrientation != null) {
+                    binding.btnOrientation.setContentDescription("Toggle fullscreen");
+                }
+                if (binding.btnBack != null) {
+                    binding.btnBack.setContentDescription("Go back");
+                }
+                if (binding.videoProgress != null) {
+                    binding.videoProgress.setContentDescription("Video progress");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error setting up accessibility", e);
+            }
+        }
+
+        void updatePlayPauseButton() {
+            if (playerRef.get() == null || binding == null || binding.btnPlayPause == null) return;
+            
+            ExoPlayer player = playerRef.get();
+            int iconRes;
+            if (player.getPlaybackState() == Player.STATE_ENDED) {
+                iconRes = R.drawable.ic_replay;
+            } else if (player.isPlaying()) {
+                iconRes = R.drawable.ic_pause;
+            } else {
+                iconRes = R.drawable.ic_play_arrow;
+            }
+            binding.btnPlayPause.setImageResource(iconRes);
+        }
+
+        void updateOrientationButtonIcon() {
+            if (binding == null || binding.btnOrientation == null) return;
+            
+            PlayerState state = playerStateRef.get();
+            if (state == null) return;
+            
+            int iconRes = state.isFullscreen() ? R.drawable.ic_fullscreen_exit : R.drawable.ic_fullscreen;
+            binding.btnOrientation.setImageResource(iconRes);
+        }
+
+        void updateTimeDisplays(long position, long duration) {
+            if (binding == null) return;
+            
+            if (binding.txtCurrentTime != null) {
+                binding.txtCurrentTime.setText(formatTime(position));
+            }
+            if (binding.txtRemainingTime != null && duration > 0) {
+                binding.txtRemainingTime.setText("-" + formatTime(duration - position));
+            }
+        }
+
+        void showLoadingState() {
+            if (binding == null || binding.loadingIndicator == null) return;
+            
+            binding.loadingIndicator.setVisibility(View.VISIBLE);
+        }
+
+        void hideLoadingState() {
+            if (binding == null || binding.loadingIndicator == null) return;
+            
+            binding.loadingIndicator.setVisibility(View.GONE);
+        }
+
+        void showControlsInternal() {
+            PlayerState state = playerStateRef.get();
+            if (state == null) return;
+            
+            state.setControlsVisible(true);
+            if (binding == null || binding.controlsOverlay == null) return;
+            
+            binding.controlsOverlay.setVisibility(View.VISIBLE);
+            if (!state.isFullscreen()) {
+                showSystemUI();
+            }
+        }
+
+        void hideControlsInternal() {
+            PlayerState state = playerStateRef.get();
+            if (state == null) return;
+            
+            state.setControlsVisible(false);
+            if (binding == null || binding.controlsOverlay == null) return;
+            
+            binding.controlsOverlay.setVisibility(View.GONE);
+            if (state.isFullscreen()) {
+                hideSystemUI();
+            }
+        }
+
+        private void hideVideoDetails() {
+            if (binding == null || binding.videoInfoContainer == null) return;
+            
+            binding.videoInfoContainer.setVisibility(View.GONE);
+        }
+
+        private void showVideoDetails() {
+            if (binding == null || binding.videoInfoContainer == null) return;
+            
+            binding.videoInfoContainer.setVisibility(View.VISIBLE);
+        }
+
+        private void hideSystemUI() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                getWindow().getInsetsController().hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                getWindow().getInsetsController().setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            } else {
+                getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN
+                );
+            }
+        }
+
+        private void showSystemUI() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                getWindow().getInsetsController().show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+            } else {
+                getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+            }
+        }
+
+        private void setupSystemUI() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                getWindow().setStatusBarColor(ContextCompat.getColor(PlayerActivity.this, R.color.black));
+                getWindow().setNavigationBarColor(ContextCompat.getColor(PlayerActivity.this, R.color.black));
+            }
+        }
+
+        private void setupBackPressHandler() {
+            getOnBackPressedDispatcher().addCallback(PlayerActivity.this, new OnBackPressedCallback(true) {
+                @Override
+                public void handleOnBackPressed() {
+                    handleBackPress();
+                }
+            });
+        }
+        
+        private void handleUIError(String message, Exception e) {
+            Log.e(TAG, message, e);
+            ErrorRecoveryManager errorManager = errorRecoveryRef.get();
+            if (errorManager != null) {
+                errorManager.handleUIError(message, e);
+            }
+        }
+
+        private void showFeatureNotImplemented(String feature) {
+            try {
+                String message = feature + " feature is not yet implemented";
+                Toast.makeText(PlayerActivity.this, message, Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "Feature not implemented: " + feature);
+            } catch (Exception e) {
+                Log.e(TAG, "Error showing feature not implemented message", e);
+            }
+        }
+    }
+
+    /**
+     * Added comprehensive error recovery and retry mechanism
+     */
+    private class ErrorRecoveryManager {
+        private final AtomicBoolean isRecovering = new AtomicBoolean(false);
+        
+        public void handlePlayerError(PlaybackException error) {
+            if (isRecovering.get() || isDestroyed.get()) return;
+            
+            PlayerState state = playerStateRef.get();
+            if (state == null) return;
+            
+            Log.e(TAG, "Player error occurred: " + error.getMessage(), error);
+            
+            if (state.getRetryCount() < MAX_RETRY_ATTEMPTS) {
+                isRecovering.set(true);
+                state.incrementRetryCount();
+                
+                mainHandler.postDelayed(() -> {
+                    if (!isDestroyed.get()) {
+                        attemptRecovery();
+                    }
+                }, RETRY_DELAY_MS);
+            } else {
+                showError("Playback failed after multiple attempts: " + error.getErrorCodeName());
+                state.resetRetryCount();
+            }
+        }
+        
+        public void handleUIError(String message, Exception e) {
+            Log.e(TAG, "UI Error: " + message, e);
+            showError("UI Error: " + message);
+        }
+        
+        private void attemptRecovery() {
+            try {
+                ExoPlayer player = playerRef.get();
+                VideoMetadata metadata = videoMetadataRef.get();
+                PlayerState state = playerStateRef.get();
+                
+                if (player != null && metadata != null && state != null) {
+                    Log.d(TAG, "Attempting recovery - retry count: " + state.getRetryCount());
+                    
+                    // Save current position
+                    long position = player.getCurrentPosition();
+                    state.setPlaybackPosition(position);
+                    
+                    // Recreate player if necessary
+                    player.stop();
+                    player.clearMediaItems();
+                    
+                    // Reload video
+                    loadVideoContent(metadata.getVideoUrl());
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Recovery attempt failed", e);
+                showError("Recovery failed: " + e.getMessage());
+            } finally {
+                isRecovering.set(false);
+            }
+        }
+    }
+
+    //region ENHANCED ACTIVITY LIFECYCLE & STATE MANAGEMENT
+    //==============================================================================================
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        initializeActivity(savedInstanceState);
-        setupUI();
         
-        // Only load video content if not already loaded (prevents reload on orientation change)
-        if (!isVideoLoaded) {
-            loadVideoContent();
+        try {
+            Log.d(TAG, "onCreate - Starting initialization");
+            
+            binding = ActivityPlayerBinding.inflate(getLayoutInflater());
+            setContentView(binding.getRoot());
+
+            initializeComponents();
+            restoreState(savedInstanceState);
+            initializePlayer();
+            setupUI();
+
+            VideoMetadata metadata = videoMetadataRef.get();
+            PlayerState state = playerStateRef.get();
+            
+            if (metadata != null && state != null && !state.isVideoLoaded && 
+                metadata.getVideoUrl() != null && !metadata.getVideoUrl().isEmpty()) {
+                loadVideoContent(metadata.getVideoUrl());
+            }
+            
+            isInitialized.set(true);
+            Log.d(TAG, "onCreate - Initialization completed successfully");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Critical error in onCreate", e);
+            showError("Failed to initialize player: " + e.getMessage());
+            finish();
         }
     }
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        savePlayerState(outState);
-        saveVideoMetadata(outState);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (player != null && player.isPlaying()) {
-            player.pause();
+        
+        try {
+            Log.d(TAG, "onSaveInstanceState - Saving state");
+            
+            saveCurrentState();
+            
+            PlayerState state = playerStateRef.get();
+            VideoMetadata metadata = videoMetadataRef.get();
+            
+            if (state != null) {
+                outState.putBundle(STATE_PLAYER_STATE, state.toBundle());
+            }
+            if (metadata != null) {
+                outState.putBundle(STATE_VIDEO_METADATA, metadata.toBundle());
+            }
+            
+            Bundle uiState = new Bundle();
+            if (binding != null && binding.videoProgress != null) {
+                uiState.putInt("seekbar_progress", binding.videoProgress.getProgress());
+            }
+            outState.putBundle(STATE_UI_STATE, uiState);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error saving instance state", e);
         }
-        stopAllTimers();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (player != null && playWhenReady) {
-            player.play();
-        }
-        startProgressUpdates();
-    }
-
-    @Override
-    protected void onDestroy() {
-        releasePlayer();
-        cleanupResources();
-        super.onDestroy();
     }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         
-        // Save current state
-        boolean wasControlsVisible = controlsVisible;
+        try {
+            Log.d(TAG, "onConfigurationChanged - Handling configuration change");
+            
+            extractAndPlayVideo(videosUrl);
+            
+            isConfigurationChanging.set(true);
+            saveCurrentState();
         
-        // Handle orientation change without recreating UI completely
-        handleOrientationChange(newConfig);
+            PlayerState state = playerStateRef.get();
+            boolean wasControlsVisible = state != null && state.isControlsVisible();
+            long savedPosition = state != null ? state.getPlaybackPosition() : 0;
+            boolean shouldPlayWhenReady = state != null ? state.shouldPlayWhenReady() : false;
+
+            // Recreate binding
+            binding = ActivityPlayerBinding.inflate(getLayoutInflater());
+            setContentView(binding.getRoot());
+
+            // Reinitialize UI
+            UIController uiController = uiControllerRef.get();
+            if (uiController != null) {
+                uiController.initialize();
+            }
+
+            // Reattach player to view
+            ExoPlayer player = playerRef.get();
+            if (player != null && binding.playerView != null) {
+                binding.playerView.setPlayer(player);
+                binding.playerView.setUseController(false);
+            
+                if (savedPosition > 0) {
+                    player.seekTo(savedPosition);
+                }
+                player.setPlayWhenReady(shouldPlayWhenReady);
+            }
+
+            setupUI();
+
+            // Restore controls visibility
+            if (uiController != null) {
+                if (wasControlsVisible) {
+                    uiController.showControlsInternal();
+                } else {
+                    uiController.hideControlsInternal();
+                }
+            }
         
-        // Restore controls state
-        if (wasControlsVisible) {
-            showControlsInternal();
+            if (player != null && shouldPlayWhenReady) {
+                startProgressUpdates();
+            }
+        
+            isConfigurationChanging.set(false);
+            Log.d(TAG, "onConfigurationChanged - Configuration change handled successfully");
+        
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling configuration change", e);
+            isConfigurationChanging.set(false);
+            Toast.makeText(getBaseContext(), "Failed" ,Toast.LENGTH_SHORT).show();
         }
     }
 
-    // Initialization methods
-    private void initializeActivity(@Nullable Bundle savedInstanceState) {
-        binding = ActivityPlayerBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+    @Override
+    protected void onPause() {
+        super.onPause();
         
-        if (savedInstanceState != null) {
-            restorePlayerState(savedInstanceState);
-            restoreVideoMetadata(savedInstanceState);
+        try {
+            Log.d(TAG, "onPause - Pausing activity");
+            
+            saveCurrentState();
+            
+            ExoPlayer player = playerRef.get();
+            if (player != null && !isConfigurationChanging.get()) {
+                player.pause();
+            }
+            
+            stopAllTimers();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onPause", e);
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
         
-        backgroundExecutor = Executors.newSingleThreadExecutor();
-        streamExtractor = new StreamExtractor();
-        
-        setupSystemUI();
-        setupBackPressHandler();
+        try {
+            Log.d(TAG, "onResume - Resuming activity");
+            
+            ExoPlayer player = playerRef.get();
+            PlayerState state = playerStateRef.get();
+            
+            if (player != null && state != null && state.shouldPlayWhenReady() && !isConfigurationChanging.get()) {
+                player.play();
+            }
+            
+            startProgressUpdates();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onResume", e);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            Log.d(TAG, "onDestroy - Cleaning up resources");
+            
+            isDestroyed.set(true);
+            
+            // Cancel any ongoing loading tasks
+            Future<?> loadingTask = currentLoadingTask.get();
+            if (loadingTask != null && !loadingTask.isDone()) {
+                loadingTask.cancel(true);
+            }
+            
+            releasePlayer();
+            cleanupResources();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onDestroy", e);
+        } finally {
+            binding = null;
+            super.onDestroy();
+        }
+    }
+
+    //endregion
+
+    //region ENHANCED INITIALIZATION & SETUP
+    //==============================================================================================
+
+    private void initializeComponents() {
+        try {
+            playerStateRef.set(new PlayerState());
+            videoMetadataRef.set(new VideoMetadata());
+            uiControllerRef.set(new UIController());
+            streamExtractorRef.set(new StreamExtractor());
+            errorRecoveryRef.set(new ErrorRecoveryManager());
+            
+            ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "PlayerActivity-Background");
+                t.setDaemon(true);
+                return t;
+            });
+            backgroundExecutorRef.set(executor);
+            
+            Log.d(TAG, "Components initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize components", e);
+            throw new RuntimeException("Component initialization failed", e);
+        }
+    }
+
+    private void restoreState(Bundle savedInstanceState) {
+        try {
+            PlayerState state = playerStateRef.get();
+            VideoMetadata metadata = videoMetadataRef.get();
+            
+            if (state == null || metadata == null) {
+                Log.e(TAG, "State objects not initialized");
+                return;
+            }
+            
+            if (savedInstanceState != null) {
+                Log.d(TAG, "Restoring state from saved instance");
+                
+                Bundle playerStateBundle = savedInstanceState.getBundle(STATE_PLAYER_STATE);
+                Bundle metadataBundle = savedInstanceState.getBundle(STATE_VIDEO_METADATA);
+                
+                if (playerStateBundle != null) {
+                    state.fromBundle(playerStateBundle);
+                }
+                if (metadataBundle != null) {
+                    metadata.fromBundle(metadataBundle);
+                }
+            } else {
+                Log.d(TAG, "Initializing from intent extras");
+                
+                Intent intent = getIntent();
+                if (intent != null) {
+                    metadata.setVideoUrl(intent.getStringExtra(EXTRA_VIDEO_URL));
+                    metadata.setVideoTitle(intent.getStringExtra(EXTRA_VIDEO_TITLE));
+                    metadata.channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error restoring state", e);
+        }
+    }
+
+    private void initializePlayer() {
+        try {
+            ExoPlayer existingPlayer = playerRef.get();
+            if (existingPlayer == null) {
+                ExoPlayer newPlayer = new ExoPlayer.Builder(this)
+                    .setSeekBackIncrementMs(SEEK_INCREMENT_MS)
+                    .setSeekForwardIncrementMs(SEEK_INCREMENT_MS)
+                    .build();
+                
+                newPlayer.addListener(this);
+                playerRef.set(newPlayer);
+                
+                Log.d(TAG, "ExoPlayer initialized successfully");
+            }
+            
+            ExoPlayer player = playerRef.get();
+            if (player != null && binding != null && binding.playerView != null) {
+                binding.playerView.setPlayer(player);
+                binding.playerView.setUseController(false);
+                
+                PlayerState state = playerStateRef.get();
+                if (state != null) {
+                    if (state.getPlaybackPosition() > 0) {
+                        player.seekTo(state.getPlaybackPosition());
+                    }
+                    player.setPlayWhenReady(state.shouldPlayWhenReady());
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize player", e);
+            showError("Failed to initialize video player");
+        }
     }
 
     private void setupUI() {
-        initializePlayer();
-        setupEventListeners();
-        setupInitialLayout();
-        
-        // Restore video metadata if available
-        if (videoTitle != null || channelName != null) {
-            displayVideoMetadata();
+        UIController uiController = uiControllerRef.get();
+        if (uiController != null) {
+            uiController.initialize();
+            uiController.updateForOrientation();
+            uiController.displayVideoMetadata();
         }
     }
 
-    private void setupInitialLayout() {
-        // Set initial overlay visibility
-        hideControlsInternal();
+    private void saveCurrentState() {
+        ExoPlayer player = playerRef.get();
+        PlayerState state = playerStateRef.get();
         
-        // Configure player view for touch handling
-        binding.playerView.setUseController(false);
-        binding.playerView.setOnClickListener(v -> toggleOverlayVisibility());
-        
-        // Setup initial orientation state
-        Configuration config = getResources().getConfiguration();
-        isFullscreen = (config.orientation == Configuration.ORIENTATION_LANDSCAPE);
-        updateLayoutForOrientation();
-    }
-
-    private void setupSystemUI() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            int color = ContextCompat.getColor(this, R.color.black);
-            getWindow().setStatusBarColor(color);
-            getWindow().setNavigationBarColor(color);
+        if (player != null && state != null) {
+            state.setPlaybackPosition(player.getCurrentPosition());
+            state.setPlayWhenReady(player.getPlayWhenReady());
         }
     }
 
-    private void setupBackPressHandler() {
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                if (isFullscreen) {
-                    exitFullscreen();
-                } else {
-                    finish();
-                }
+    //endregion
+
+    //region ENHANCED VIDEO LOADING & METADATA
+    //==============================================================================================
+
+    private void loadVideoContent(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            showError("No video URL provided");
+            return;
+        }
+        
+        if (isDestroyed.get()) {
+            Log.w(TAG, "Activity destroyed, skipping video load");
+            return;
+        }
+        
+        // Cancel any existing loading task
+        Future<?> existingTask = currentLoadingTask.get();
+        if (existingTask != null && !existingTask.isDone()) {
+            existingTask.cancel(true);
+        }
+        
+        UIController uiController = uiControllerRef.get();
+        if (uiController != null) {
+            uiController.showLoadingState();
+        }
+        
+        ExecutorService executor = backgroundExecutorRef.get();
+        if (executor != null && !executor.isShutdown()) {
+            Future<?> task = executor.submit(() -> extractAndPlayVideo(url.trim()));
+            currentLoadingTask.set(task);
+        }
+    }
+
+    private void extractAndPlayVideo(String url) {
+        if (Thread.currentThread().isInterrupted() || isDestroyed.get()) {
+            Log.d(TAG, "Video extraction cancelled");
+            return;
+        }
+        
+        try {
+            Log.d(TAG, "Starting video extraction for: " + url);
+            
+            StreamExtractor extractor = streamExtractorRef.get();
+            if (extractor == null) {
+                throw new IllegalStateException("Stream extractor not initialized");
             }
-        });
-    }
+            
+            // Check for cancellation before extraction
+            if (Thread.currentThread().isInterrupted()) return;
+            
+            StreamInfo streamInfo = extractor.extractStreamInfo(url);
+            
+            // Check for cancellation after extraction
+            if (Thread.currentThread().isInterrupted()) return;
+            
+            String streamUrl = extractor.extractVideoStream(url);
 
-    // Player management
-    private void initializePlayer() {
-        if (player == null) {
-            player = new ExoPlayer.Builder(this).build();
-            player.addListener(this);
+            mainHandler.post(() -> {
+                if (isDestroyed.get()) return;
+                
+                UIController uiController = uiControllerRef.get();
+                
+                try {
+                    if (streamUrl != null && !streamUrl.isEmpty()) {
+                        if (streamInfo != null) {
+                            populateVideoMetadata(streamInfo);
+                        }
+                        playVideo(streamUrl);
+                        
+                        // Reset retry count on successful load
+                        PlayerState state = playerStateRef.get();
+                        if (state != null) {
+                            state.resetRetryCount();
+                        }
+                    } else {
+                        showError("Failed to extract video stream");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in video playback setup", e);
+                    showError("Failed to setup video playback: " + e.getMessage());
+                } finally {
+                    if (uiController != null) {
+                        uiController.hideLoadingState();
+                    }
+                }
+            });
+            
+        } catch (InterruptedException e) {
+            Log.d(TAG, "Video extraction interrupted");
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to load video", e);
+            mainHandler.post(() -> {
+                if (!isDestroyed.get()) {
+                    ErrorRecoveryManager errorManager = errorRecoveryRef.get();
+                    if (errorManager != null) {
+                        // This will trigger retry logic if appropriate
+                        errorManager.handlePlayerError(new PlaybackException("Stream extraction failed", e, PlaybackException.ERROR_CODE_IO_UNSPECIFIED));
+                    } else {
+                        showError("Failed to load video: " + e.getMessage());
+                    }
+                    
+                    UIController uiController = uiControllerRef.get();
+                    if (uiController != null) {
+                        uiController.hideLoadingState();
+                    }
+                }
+            });
         }
-        binding.playerView.setPlayer(player);
-        binding.playerView.setUseController(false);
     }
 
     private void playVideo(String streamUrl) {
-        if (player == null || streamUrl == null) return;
-        
-        MediaItem mediaItem = MediaItem.fromUri(streamUrl);
-        player.setMediaItem(mediaItem);
-        player.prepare();
-        player.seekTo(playbackPosition);
-        player.setPlayWhenReady(playWhenReady);
-        
-        isVideoLoaded = true;
-        Log.d(TAG, "Playing video: " + streamUrl);
-    }
+        if (streamUrl == null) return;
 
-    private void togglePlayPause() {
-        if (player == null) return;
-        
-        if (player.isPlaying()) {
-            player.pause();
-        } else {
-            player.play();
-        }
-        resetOverlayTimer();
-    }
-
-    private void seekBackward() {
-        if (player == null || isLiveStream) return;
-        long newPosition = Math.max(0, player.getCurrentPosition() - SEEK_INCREMENT_MS);
-        player.seekTo(newPosition);
-        resetOverlayTimer();
-    }
-
-    private void seekForward() {
-        if (player == null || isLiveStream) return;
-        long duration = player.getDuration();
-        long newPosition = Math.min(duration, player.getCurrentPosition() + SEEK_INCREMENT_MS);
-        player.seekTo(newPosition);
-        resetOverlayTimer();
-    }
-
-    private void releasePlayer() {
-        if (player != null) {
-            playbackPosition = player.getCurrentPosition();
-            playWhenReady = player.getPlayWhenReady();
-            player.removeListener(this);
-            player.release();
-            player = null;
-        }
-    }
-
-    // State management
-    private void savePlayerState(Bundle outState) {
-        if (player != null) {
-            outState.putLong("video_position", player.getCurrentPosition());
-            outState.putBoolean("video_playing", player.getPlayWhenReady());
-        }
-        outState.putBoolean("video_loaded", isVideoLoaded);
-        outState.putBoolean("is_live_stream", isLiveStream);
-        outState.putBoolean("is_fullscreen", isFullscreen);
-        outState.putBoolean("controls_visible", controlsVisible);
-    }
-
-    private void restorePlayerState(Bundle savedInstanceState) {
-        playbackPosition = savedInstanceState.getLong("video_position", 0);
-        playWhenReady = savedInstanceState.getBoolean("video_playing", true);
-        isVideoLoaded = savedInstanceState.getBoolean("video_loaded", false);
-        isLiveStream = savedInstanceState.getBoolean("is_live_stream", false);
-        isFullscreen = savedInstanceState.getBoolean("is_fullscreen", false);
-        controlsVisible = savedInstanceState.getBoolean("controls_visible", false);
-    }
-
-    private void saveVideoMetadata(Bundle outState) {
-        if (videoTitle != null) outState.putString("video_title", videoTitle);
-        if (channelName != null) outState.putString("channel_name", channelName);
-        if (videoMetadata != null) outState.putString("video_metadata", videoMetadata);
-        if (likeCount != null) outState.putString("like_count", likeCount);
-    }
-
-    private void restoreVideoMetadata(Bundle savedInstanceState) {
-        videoTitle = savedInstanceState.getString("video_title");
-        channelName = savedInstanceState.getString("channel_name");
-        videoMetadata = savedInstanceState.getString("video_metadata");
-        likeCount = savedInstanceState.getString("like_count");
-    }
-
-    // Video loading
-    private void loadVideoContent() {
-        loadInitialVideoData();
-        String videoUrl = getIntent().getStringExtra(EXTRA_VIDEO_URL);
-        
-        if (videoUrl != null && !videoUrl.trim().isEmpty()) {
-            loadVideo(videoUrl.trim());
-        } else {
-            showError("No video URL provided");
-        }
-    }
-
-    private void loadInitialVideoData() {
-        Intent intent = getIntent();
-        String intentTitle = intent.getStringExtra(EXTRA_VIDEO_TITLE);
-        String intentChannelName = intent.getStringExtra(EXTRA_CHANNEL_NAME);
-        
-        // Only use intent data if not already loaded from saved state
-        if (videoTitle == null && intentTitle != null && !intentTitle.isEmpty()) {
-            videoTitle = intentTitle;
-        }
-        if (channelName == null && intentChannelName != null && !intentChannelName.isEmpty()) {
-            channelName = intentChannelName;
-        }
-        
-        displayVideoMetadata();
-    }
-
-    private void displayVideoMetadata() {
-        setTextIfNotNull(binding.txtTitle, videoTitle);
-        setTextIfNotNull(binding.txtChannelName, channelName);
-        setTextIfNotNull(binding.txtMeta, videoMetadata);
-        setTextIfNotNull(binding.txtLikeCount, likeCount);
-    }
-
-    private void populateVideoMetadata(StreamInfo streamInfo) {
         try {
-            // Update title if not already set
-            if (streamInfo.getName() != null && !streamInfo.getName().isEmpty()) {
-                videoTitle = streamInfo.getName();
+            ExoPlayer player = playerRef.get();
+            PlayerState state = playerStateRef.get();
+
+            if (player == null) {
+                Log.e(TAG, "Player is null, cannot play video");
+                showError("Player is not initialized");
+                return;
             }
 
-            // Update channel name if available
-            if (streamInfo.getUploaderName() != null && !streamInfo.getUploaderName().isEmpty()) {
-                channelName = streamInfo.getUploaderName();
+            MediaItem mediaItem = MediaItem.fromUri(streamUrl);
+            player.setMediaItem(mediaItem);
+
+            if (state != null) {
+                player.seekTo(state.getPlaybackPosition());
+                player.setPlayWhenReady(state.shouldPlayWhenReady());
             }
 
-            // Update view count and upload date metadata
-            if (streamInfo.getViewCount() > 0 || streamInfo.getUploadDate() != null) {
-                String metaText = "";
-                if (streamInfo.getViewCount() > 0) {
-                    metaText = formatViewCount(streamInfo.getViewCount()) + " views";
-                }
-                if (streamInfo.getUploadDate() != null) {
-                    DateWrapper uploadDate = streamInfo.getUploadDate();
-                    if (uploadDate != null && uploadDate.date() != null) {
-                        long uploadTimeMs = uploadDate.date().getTimeInMillis();
-                        String timeAgo = formatTimeAgo(uploadTimeMs);
-                        if (!metaText.isEmpty()) {
-                            metaText += " • " + timeAgo;
-                        } else {
-                            metaText = timeAgo;
-                        }
-                    }
-                }
-                videoMetadata = metaText;
+            player.prepare();
+
+            if (state != null) {
+                state.isVideoLoaded = true;
             }
 
-            // Update like count if available
-            if (streamInfo.getLikeCount() > 0) {
-                likeCount = formatViewCount(streamInfo.getLikeCount());
+            Log.d(TAG, "Playing video: " + streamUrl);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error playing video", e);
+            showError("Failed to play video: " + e.getMessage());
+        }
+    }
+
+    private void populateVideoMetadata(StreamInfo info) {
+        try {
+            VideoMetadata metadata = videoMetadataRef.get();
+            if (metadata == null) return;
+
+            metadata.setVideoTitle(info.getName());
+            metadata.channelName = info.getUploaderName();
+            metadata.setLiveStream(info.getStreamType() == org.schabi.newpipe.extractor.stream.StreamType.LIVE_STREAM);
+
+            String views = (info.getViewCount() > 0) ? formatViewCount(info.getViewCount()) + " views" : "";
+            String date = "";
+            if (info.getUploadDate() != null) {
+                date = formatTimeAgo(info.getUploadDate().date().getTimeInMillis());
+            }
+            metadata.videoInfo = views.isEmpty() ? date : views + " • " + date;
+
+            if (info.getLikeCount() > 0) {
+                metadata.likeCount = formatViewCount(info.getLikeCount());
             }
 
-            // Check if this is a live stream
-            isLiveStream = streamInfo.getStreamType() == org.schabi.newpipe.extractor.stream.StreamType.LIVE_STREAM;
+            UIController uiController = uiControllerRef.get();
+            if (uiController != null) {
+                runOnUiThread(() -> uiController.displayVideoMetadata());
+            }
 
-            displayVideoMetadata();
-            Log.d(TAG, "Video metadata populated successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error populating video metadata", e);
         }
     }
 
-    private void loadVideo(String videoUrl) {
-        if (isFinishing()) return;
-        
-        showLoadingState();
-        backgroundExecutor.submit(() -> extractAndPlayVideo(videoUrl));
-    }
+    //endregion
 
-    private void extractAndPlayVideo(String videoUrl) {
+    //region ENHANCED PLAYER LISTENER IMPLEMENTATION
+    //==============================================================================================
+
+    @Override
+    public void onPlaybackStateChanged(int playbackState) {
+        if (isDestroyed.get()) return;
+        
         try {
-            StreamInfo streamInfo = streamExtractor.extractStreamInfo(videoUrl);
-            String streamUrl = streamExtractor.extractVideoStream(videoUrl);
+            PlayerState state = playerStateRef.get();
+            UIController uiController = uiControllerRef.get();
             
-            mainHandler.post(() -> {
-                if (isFinishing()) return;
-                
-                if (streamUrl != null) {
-                    if (streamInfo != null) {
-                        populateVideoMetadata(streamInfo);
-                    }
-                    playVideo(streamUrl);
-                } else {
-                    showError("Failed to extract video stream");
-                }
-                hideLoadingState();
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load video", e);
-            mainHandler.post(() -> showError("Failed to load video: " + e.getMessage()));
-        }
-    }
-
-    // UI event handlers
-    private void setupEventListeners() {
-        // Player view tap for overlay toggle
-        setClickListenerIfNotNull(binding.playerView, v -> toggleOverlayVisibility());
-        
-        // Control buttons
-        setClickListenerIfNotNull(binding.btnPlayPause, v -> togglePlayPause());
-        setClickListenerIfNotNull(binding.btnReplay10, v -> seekBackward());
-        setClickListenerIfNotNull(binding.btnForward10, v -> seekForward());
-        setClickListenerIfNotNull(binding.btnOrientation, v -> toggleOrientation());
-        setClickListenerIfNotNull(binding.btnBack, v -> {
-            if (isFullscreen) {
-                exitFullscreen();
-            } else {
-                finish();
+            if (state != null) {
+                state.playbackState = playbackState;
             }
-        });
-        
-        setupSeekBar();
-    }
-
-    private void setupSeekBar() {
-        if (binding.videoProgress != null) {
-            binding.videoProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override
-                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    if (fromUser && player != null && !isLiveStream) {
-                        long duration = player.getDuration();
-                        if (duration > 0) {
-                            long position = (duration * progress) / 100;
-                            player.seekTo(position);
-                        }
+            
+            switch (playbackState) {
+                case Player.STATE_BUFFERING:
+                    if (state != null) state.isBuffering = true;
+                    if (uiController != null) uiController.showLoadingState();
+                    Log.d(TAG, "Player state: BUFFERING");
+                    break;
+                    
+                case Player.STATE_READY:
+                    if (state != null) {
+                        state.isBuffering = false;
+                        state.isVideoLoaded = true;
                     }
-                }
-
-                @Override
-                public void onStartTrackingTouch(SeekBar seekBar) {
-                    stopOverlayTimer();
-                }
-
-                @Override
-                public void onStopTrackingTouch(SeekBar seekBar) {
-                    resetOverlayTimer();
-                }
-            });
+                    if (uiController != null) uiController.hideLoadingState();
+                    Log.d(TAG, "Player state: READY");
+                    break;
+                    
+                case Player.STATE_ENDED:
+                    if (uiController != null) uiController.hideLoadingState();
+                    Log.d(TAG, "Player state: ENDED");
+                    break;
+                    
+                case Player.STATE_IDLE:
+                    Log.d(TAG, "Player state: IDLE");
+                    break;
+            }
+            
+            if (uiController != null) {
+                uiController.updatePlayPauseButton();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling playback state change", e);
         }
     }
 
-    // Overlay management
-    private void toggleOverlayVisibility() {
-        if (controlsVisible) {
-            hideControls();
+    @Override
+    public void onIsPlayingChanged(boolean isPlaying) {
+        if (isDestroyed.get()) return;
+        
+        try {
+            UIController uiController = uiControllerRef.get();
+            if (uiController != null) {
+                uiController.updatePlayPauseButton();
+            }
+            
+            if (isPlaying) {
+                startProgressUpdates();
+                resetOverlayTimer();
+                Log.d(TAG, "Playback started");
+            } else {
+                stopAllTimers();
+                showControls();
+                Log.d(TAG, "Playback paused");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling playing state change", e);
+        }
+    }
+
+    @Override
+    public void onPlayerError(@NonNull PlaybackException error) {
+        if (isDestroyed.get()) return;
+        
+        Log.e(TAG, "Player error: " + error.getMessage(), error);
+        
+        ErrorRecoveryManager errorManager = errorRecoveryRef.get();
+        if (errorManager != null) {
+            errorManager.handlePlayerError(error);
         } else {
-            showControls();
-        }
-    }
-
-    private void showControls() {
-        showControlsInternal();
-        resetOverlayTimer();
-    }
-
-    private void hideControls() {
-        hideControlsInternal();
-        stopOverlayTimer();
-    }
-
-    private void showControlsInternal() {
-        if (binding.controlsOverlay != null) {
-            binding.controlsOverlay.setVisibility(View.VISIBLE);
-            binding.controlsOverlay.setAlpha(0f);
-            binding.controlsOverlay.animate()
-                .alpha(1f)
-                .setDuration(300)
-                .start();
+            showError("Playback error: " + error.getErrorCodeName());
         }
         
-        if (!isFullscreen) {
-            setVisibilityIfNotNull(binding.videoProgress, View.VISIBLE);
-            //setVisibilityIfNotNull(binding.timeContainer, View.VISIBLE);
+        UIController uiController = uiControllerRef.get();
+        if (uiController != null) {
+            uiController.hideLoadingState();
         }
-        
-        controlsVisible = true;
-        startProgressUpdates();
     }
 
-    private void hideControlsInternal() {
-        if (binding.controlsOverlay != null) {
-            binding.controlsOverlay.animate()
-                .alpha(0f)
-                .setDuration(300)
-                .withEndAction(() -> {
-                    if (binding.controlsOverlay != null) {
-                        binding.controlsOverlay.setVisibility(View.GONE);
+    //endregion
+
+    //region ENHANCED RESOURCE MANAGEMENT & CLEANUP
+    //==============================================================================================
+
+    private void releasePlayer() {
+        try {
+            ExoPlayer player = playerRef.get();
+            if (player != null) {
+                Log.d(TAG, "Releasing ExoPlayer");
+                
+                saveCurrentState();
+                player.removeListener(this);
+                player.stop();
+                player.release();
+                playerRef.set(null);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error releasing player", e);
+        }
+    }
+
+    private void cleanupResources() {
+        try {
+            Log.d(TAG, "Cleaning up resources");
+            
+            stopAllTimers();
+            mainHandler.removeCallbacksAndMessages(null);
+            
+            // Cancel any ongoing tasks
+            Future<?> loadingTask = currentLoadingTask.get();
+            if (loadingTask != null && !loadingTask.isDone()) {
+                loadingTask.cancel(true);
+            }
+            
+            ExecutorService executor = backgroundExecutorRef.get();
+            if (executor != null && !executor.isShutdown()) {
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(1000, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                        executor.shutdownNow();
                     }
-                })
-                .start();
-        }
-        
-        if (isFullscreen) {
-            setVisibilityIfNotNull(binding.videoProgress, View.GONE);
-           // setVisibilityIfNotNull(binding.timeContainer, View.GONE);
-        }
-        
-        controlsVisible = false;
-    }
-
-    private void startOverlayTimer() {
-        mainHandler.removeCallbacks(hideControlsRunnable);
-        mainHandler.postDelayed(hideControlsRunnable, CONTROLS_HIDE_DELAY_MS);
-    }
-
-    private void stopOverlayTimer() {
-        mainHandler.removeCallbacks(hideControlsRunnable);
-    }
-
-    private void resetOverlayTimer() {
-        stopOverlayTimer();
-        if (player != null && player.isPlaying()) {
-            startOverlayTimer();
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+                backgroundExecutorRef.set(null);
+            }
+            
+            // Clear references
+            playerStateRef.set(null);
+            videoMetadataRef.set(null);
+            uiControllerRef.set(null);
+            streamExtractorRef.set(null);
+            errorRecoveryRef.set(null);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error during resource cleanup", e);
         }
     }
 
-    // Orientation management
-    private void handleOrientationChange(Configuration newConfig) {
-        boolean newIsFullscreen = (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE);
-        
-        if (newIsFullscreen != isFullscreen) {
-            isFullscreen = newIsFullscreen;
-            updateLayoutForOrientation();
+    private void updateProgress() {
+        if (isDestroyed.get()) return;
+
+        try {
+            ExoPlayer player = playerRef.get();
+            VideoMetadata metadata = videoMetadataRef.get();
+
+            if (player == null) return;
+
+            if (metadata != null && metadata.isLiveStream()) {
+                if (binding != null && binding.videoProgress != null) {
+                    binding.videoProgress.setProgress(100);
+                }
+                if (binding != null && binding.txtCurrentTime != null) {
+                    binding.txtCurrentTime.setText("LIVE");
+                }
+                if (binding != null && binding.txtRemainingTime != null) {
+                    binding.txtRemainingTime.setText("");
+                }
+                return;
+            }
+
+            long position = player.getCurrentPosition();
+            long duration = player.getDuration();
+
+            if (binding != null && binding.videoProgress != null && duration > 0) {
+                binding.videoProgress.setProgress((int) ((position * 100) / duration));
+            }
+
+            UIController uiController = uiControllerRef.get();
+            if (uiController != null) {
+                uiController.updateTimeDisplays(position, duration);
+            }
+
+            mainHandler.postDelayed(updateProgressRunnable, PROGRESS_UPDATE_INTERVAL_MS);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating progress", e);
+        }
+    }
+
+    private void togglePlayPause() {
+        ExoPlayer player = playerRef.get();
+        if (player == null) return;
+
+        try {
+            if (player.isPlaying()) {
+                player.pause();
+            } else {
+                player.prepare();
+                player.play();
+            }
+            resetOverlayTimer();
+        } catch (Exception e) {
+            Log.e(TAG, "Error toggling play/pause", e);
+        }
+    }
+
+    private void seek(int amountMs) {
+        ExoPlayer player = playerRef.get();
+        VideoMetadata metadata = videoMetadataRef.get();
+
+        if (player == null || metadata == null || metadata.isLiveStream()) return;
+
+        try {
+            long newPosition = player.getCurrentPosition() + amountMs;
+            long duration = player.getDuration();
+
+            if (duration > 0) {
+                newPosition = Math.max(0, Math.min(newPosition, duration));
+            } else {
+                newPosition = Math.max(0, newPosition);
+            }
+
+            player.seekTo(newPosition);
+            resetOverlayTimer();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error seeking", e);
         }
     }
 
     private void toggleOrientation() {
-        // Simple boolean toggle logic as requested
-        if (isFullscreen) {
+        PlayerState state = playerStateRef.get();
+        if (state == null) return;
+
+        if (state.isFullscreen()) {
             exitFullscreen();
         } else {
             enterFullscreen();
@@ -568,220 +1379,180 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
     }
 
     private void enterFullscreen() {
-        isFullscreen = true;
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-        updateLayoutForOrientation();
-        
-        if (controlsVisible) {
-            showControlsInternal();
-            resetOverlayTimer();
-        }
     }
 
     private void exitFullscreen() {
-        isFullscreen = false;
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-        updateLayoutForOrientation();
-        
-        if (controlsVisible) {
-            showControlsInternal();
-            stopOverlayTimer(); // Don't auto-hide in portrait
-        }
     }
 
-    private void updateLayoutForOrientation() {
-        if (isFullscreen) {
-            hideSystemUI();
-            adjustVideoPlayerLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-            hideVideoDetails();
-            updateOrientationButtonIcon();
+    private void handleBackPress() {
+        PlayerState state = playerStateRef.get();
+        if (state == null) return;
+
+        if (state.isFullscreen()) {
+            exitFullscreen();
         } else {
-            showSystemUI();
-            adjustVideoPlayerLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            showVideoDetails();
-            updateOrientationButtonIcon();
+            finish();
         }
     }
 
-    private void updateOrientationButtonIcon() {
-        if (binding.btnOrientation != null) {
-            int iconRes = isFullscreen ? R.drawable.ic_fullscreen_exit : R.drawable.ic_fullscreen;
-            binding.btnOrientation.setImageResource(iconRes);
-        }
-    }
+    private void toggleOverlayVisibility() {
+        PlayerState state = playerStateRef.get();
+        if (state == null) return;
 
-    private void adjustVideoPlayerLayout(int width, int height) {
-        if (binding.playerView != null) {
-            ViewGroup.LayoutParams params = binding.playerView.getLayoutParams();
-            params.width = width;
-            params.height = height;
-            binding.playerView.setLayoutParams(params);
-        }
-    }
-
-    private void hideVideoDetails() {
-        // Hide video information in landscape mode
-        setVisibilityIfNotNull(binding.videoInfoContainer, View.GONE);
-    }
-
-    private void showVideoDetails() {
-        // Show video information in portrait mode
-        setVisibilityIfNotNull(binding.videoInfoContainer, View.VISIBLE);
-    }
-
-    private void hideSystemUI() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(false);
-            WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) {
-                controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-            }
+        if (state.isControlsVisible()) {
+            hideControls();
         } else {
-            getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN |
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            );
+            showControls();
         }
     }
 
-    private void showSystemUI() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(true);
-            WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) {
-                controller.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-            }
-        } else {
-            getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            );
+    private void showControls() {
+        UIController uiController = uiControllerRef.get();
+        if (uiController != null) {
+            uiController.showControlsInternal();
+        }
+        resetOverlayTimer();
+    }
+
+    private void hideControls() {
+        UIController uiController = uiControllerRef.get();
+        if (uiController != null) {
+            uiController.hideControlsInternal();
+        }
+        stopOverlayTimer();
+    }
+
+    private void resetOverlayTimer() {
+        stopOverlayTimer();
+        ExoPlayer player = playerRef.get();
+        if (player != null && player.isPlaying()) {
+            mainHandler.postDelayed(hideControlsRunnable, CONTROLS_HIDE_DELAY_MS);
         }
     }
 
-    // Progress updates for live streams
     private void startProgressUpdates() {
-        mainHandler.removeCallbacks(updateProgressRunnable);
-        mainHandler.post(updateProgressRunnable);
+        try {
+            stopProgressUpdates(); // Stop any existing updates first
+            
+            if (progressUpdateRunnable == null) {
+                progressUpdateRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            ExoPlayer player = playerRef.get();
+                            if (player != null && !isUserSeeking.get()) {
+                                updateProgress();
+                            }
+                            
+                            if (!isDestroyed() && !isFinishing()) {
+                                mainHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error in progress update", e);
+                        }
+                    }
+                };
+            }
+            
+            mainHandler.post(progressUpdateRunnable);
+            Log.d(TAG, "Progress updates started");
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting progress updates", e);
+        }
     }
 
     private void stopProgressUpdates() {
-        mainHandler.removeCallbacks(updateProgressRunnable);
-    }
-
-    private void updateProgress() {
-        if (player == null || binding == null) return;
-        
-        long currentPosition = player.getCurrentPosition();
-        long duration = player.getDuration();
-        
-        // Update progress bar (disable for live streams)
-        if (binding.videoProgress != null) {
-            if (isLiveStream || duration <= 0) {
-                binding.videoProgress.setEnabled(false);
-                binding.videoProgress.setProgress(100); // Show full for live
-            } else {
-                binding.videoProgress.setEnabled(true);
-                int progress = (int) ((currentPosition * 100) / duration);
-                binding.videoProgress.setProgress(progress);
+        try {
+            if (progressUpdateRunnable != null) {
+                mainHandler.removeCallbacks(progressUpdateRunnable);
+                Log.d(TAG, "Progress updates stopped");
             }
-        }
-        
-        // Update time displays
-        if (binding.txtCurrentTime != null) {
-            if (isLiveStream) {
-                binding.txtCurrentTime.setText("LIVE");
-            } else {
-                binding.txtCurrentTime.setText(formatTime(currentPosition));
-            }
-        }
-        
-        if (binding.txtRemainingTime != null) {
-            if (isLiveStream || duration <= 0) {
-                binding.txtRemainingTime.setText("");
-            } else {
-                long remainingTime = duration - currentPosition;
-                binding.txtRemainingTime.setText("-" + formatTime(remainingTime));
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping progress updates", e);
         }
     }
 
-    // Utility methods
-    private String formatTime(long millis) {
-        if (millis < 0) millis = 0;
+    private void stopAllTimers() {
+        try {
+            stopProgressUpdates();
+            stopOverlayTimer();
+            Log.d(TAG, "All timers stopped");
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping all timers", e);
+        }
+    }
+
+    private void stopOverlayTimer() {
+        try {
+            if (overlayHideRunnable != null) {
+                mainHandler.removeCallbacks(overlayHideRunnable);
+                Log.d(TAG, "Overlay timer stopped");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping overlay timer", e);
+        }
+    }
+
+    private void hideControlsInternal() {
+        UIController uiController = uiControllerRef.get();
+        if (uiController != null) {
+            uiController.hideControlsInternal();
+        }
+    }
+
+    //endregion
+
+    //region ENHANCED UTILITY METHODS
+    //==============================================================================================
+
+    private void showError(String message) {
+        if (isDestroyed.get()) return;
         
-        long totalSeconds = millis / 1000;
-        long minutes = totalSeconds / 60;
-        long seconds = totalSeconds % 60;
+        Log.e(TAG, message);
         
-        if (minutes >= 60) {
-            long hours = minutes / 60;
-            minutes = minutes % 60;
+        runOnUiThread(() -> {
+            if (!isDestroyed.get()) {
+                String userMessage = getUserFriendlyErrorMessage(message);
+                Toast.makeText(this, userMessage, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private String getUserFriendlyErrorMessage(String technicalMessage) {
+        if (technicalMessage == null) return "An unknown error occurred";
+        
+        String lower = technicalMessage.toLowerCase();
+        
+        if (lower.contains("network") || lower.contains("connection")) {
+            return "Network connection error. Please check your internet connection.";
+        } else if (lower.contains("timeout")) {
+            return "Request timed out. Please try again.";
+        } else if (lower.contains("not found") || lower.contains("404")) {
+            return "Video not found or no longer available.";
+        } else if (lower.contains("permission") || lower.contains("unauthorized")) {
+            return "Access denied. This video may be private or restricted.";
+        } else if (lower.contains("format") || lower.contains("codec")) {
+            return "Video format not supported on this device.";
+        } else {
+            return "Unable to play video. Please try again later.";
+        }
+    }
+
+    private String formatTime(long milliseconds) {
+        long seconds = milliseconds / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        
+        seconds %= 60;
+        minutes %= 60;
+        
+        if (hours > 0) {
             return String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds);
         } else {
-            return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds);
+            return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
         }
-    }
-
-    private String formatTimeAgo(long uploadTimeMs) {
-        long currentTimeMs = System.currentTimeMillis();
-        long timeDifferenceMs = currentTimeMs - uploadTimeMs;
-            
-        if (timeDifferenceMs < 0) {
-            return "Just now";
-        }
-
-        long timeDifferenceSeconds = timeDifferenceMs / MILLISECONDS_IN_SECOND;
-
-        if (timeDifferenceSeconds < SECONDS_IN_MINUTE) {
-            return timeDifferenceSeconds <= 5 ? 
-                "Just now" : 
-                timeDifferenceSeconds + " seconds ago";
-        }
-
-        long timeDifferenceMinutes = timeDifferenceSeconds / SECONDS_IN_MINUTE;
-        if (timeDifferenceMinutes < MINUTES_IN_HOUR) {
-            return timeDifferenceMinutes == 1 ? 
-                "1 minute ago" : 
-                timeDifferenceMinutes + " minutes ago";
-        }
-
-        long timeDifferenceHours = timeDifferenceMinutes / MINUTES_IN_HOUR;
-        if (timeDifferenceHours < HOURS_IN_DAY) {
-            return timeDifferenceHours == 1 ? 
-                "1 hour ago" : 
-                timeDifferenceHours + " hours ago";
-        }
-
-        long timeDifferenceDays = timeDifferenceHours / HOURS_IN_DAY;
-        if (timeDifferenceDays < DAYS_IN_WEEK) {
-            return timeDifferenceDays == 1 ? 
-                "1 day ago" : 
-                timeDifferenceDays + " days ago";
-        }
-
-        long timeDifferenceWeeks = timeDifferenceDays / DAYS_IN_WEEK;
-        if (timeDifferenceDays < DAYS_IN_MONTH) {
-            return timeDifferenceWeeks == 1 ? 
-                "1 week ago" : 
-                timeDifferenceWeeks + " weeks ago";
-        }
-
-        long timeDifferenceMonths = timeDifferenceDays / DAYS_IN_MONTH;
-        if (timeDifferenceDays < DAYS_IN_YEAR) {
-            return timeDifferenceMonths == 1 ? 
-                "1 month ago" : 
-                timeDifferenceMonths + " months ago";
-        }
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
-        return dateFormat.format(new Date(uploadTimeMs));
     }
 
     private String formatViewCount(long count) {
@@ -796,141 +1567,102 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
         }
     }
 
-    // Loading states
-    private void showLoadingState() {
-        setVisibilityIfNotNull(binding.videoProgress, View.VISIBLE);
-    }
+    private String formatTimeAgo(long timeMillis) {
+        long diff = System.currentTimeMillis() - timeMillis;
+        long seconds = diff / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        long days = hours / 24;
+        long months = days / 30;
+        long years = days / 365;
 
-    private void hideLoadingState() {
-        setVisibilityIfNotNull(binding.videoProgress, View.GONE);
-    }
-
-    // Error handling
-    private void showError(String message) {
-        Log.w(TAG, "Error: " + message);
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-        hideLoadingState();
-    }
-
-    // Timer management
-    private void stopAllTimers() {
-        stopOverlayTimer();
-        stopProgressUpdates();
-    }
-
-    // Cleanup
-    private void cleanupResources() {
-        mainHandler.removeCallbacksAndMessages(null);
-        if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
-            backgroundExecutor.shutdownNow();
-        }
-    }
-
-    // ExoPlayer listener callbacks
-    @Override
-    public void onPlaybackStateChanged(int playbackState) {
-        switch (playbackState) {
-            case Player.STATE_BUFFERING:
-                showLoadingState();
-                break;
-            case Player.STATE_READY:
-                hideLoadingState();
-                if (player != null && player.isPlaying()) {
-                    resetOverlayTimer();
-                }
-                break;
-            case Player.STATE_ENDED:
-                hideLoadingState();
-                stopOverlayTimer();
-                showControls();
-                if (binding.btnPlayPause != null) {
-                    binding.btnPlayPause.setImageResource(R.drawable.ic_replay);
-                }
-                break;
-        }
-    }
-
-    @Override
-    public void onIsPlayingChanged(boolean isPlaying) {
-        if (binding.btnPlayPause != null) {
-            int iconRes = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play_arrow;
-            binding.btnPlayPause.setImageResource(iconRes);
-        }
-        
-        if (isPlaying) {
-            resetOverlayTimer();
+        if (years > 0) {
+            return years == 1 ? "1 year ago" : years + " years ago";
+        } else if (months > 0) {
+            return months == 1 ? "1 month ago" : months + " months ago";
+        } else if (days > 0) {
+            return days == 1 ? "1 day ago" : days + " days ago";
+        } else if (hours > 0) {
+            return hours == 1 ? "1 hour ago" : hours + " hours ago";
+        } else if (minutes > 0) {
+            return minutes == 1 ? "1 minute ago" : minutes + " minutes ago";
         } else {
-            stopOverlayTimer();
-            if (!controlsVisible) {
-                showControls();
-            }
+            return "Just now";
         }
     }
 
-    @Override
-    public void onPlayerError(@NonNull PlaybackException error) {
-        Log.e(TAG, "Player error", error);
-        showError("Playback error: " + error.getMessage());
-        hideLoadingState();
-        stopOverlayTimer();
-        showControls();
-    }
+    //endregion
 
-    // Utility methods
-    private void setTextIfNotNull(android.widget.TextView textView, String text) {
-        if (textView != null && text != null) {
-            textView.setText(text);
-        }
-    }
+    //region ENHANCED STREAM EXTRACTION SERVICE
+    //==============================================================================================
 
-    private void setVisibilityIfNotNull(View view, int visibility) {
-        if (view != null) {
-            view.setVisibility(visibility);
-        }
-    }
-
-    private void setClickListenerIfNotNull(View view, View.OnClickListener listener) {
-        if (view != null) {
-            view.setOnClickListener(listener);
-        }
-    }
-
-    // Stream extractor class
     private static class StreamExtractor {
+        private static final String TAG = "StreamExtractor";
         
-        public StreamInfo extractStreamInfo(String videoUrl) throws Exception {
-            Log.d(TAG, "Extracting stream info from: " + videoUrl);
-            
-            if (videoUrl.contains("youtube.com/watch") || videoUrl.contains("youtu.be/")) {
-                return StreamInfo.getInfo(ServiceList.YouTube, videoUrl);
+        public StreamInfo extractStreamInfo(String url) throws Exception {
+            if (url == null || url.trim().isEmpty()) {
+                throw new IllegalArgumentException("URL cannot be null or empty");
             }
-            return null;
+            
+            try {
+                Log.d(TAG, "Extracting stream info for: " + url);
+                StreamInfo info = StreamInfo.getInfo(ServiceList.YouTube, url);
+                
+                if (info == null) {
+                    throw new Exception("Failed to extract stream information");
+                }
+                
+                return info;
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to extract stream info", e);
+                throw new Exception("Stream info extraction failed: " + e.getMessage(), e);
+            }
         }
         
-        public String extractVideoStream(String videoUrl) throws Exception {
-            Log.d(TAG, "Extracting stream from: " + videoUrl);
+        public String extractVideoStream(String url) throws Exception {
+            if (url == null || url.trim().isEmpty()) {
+                throw new IllegalArgumentException("URL cannot be null or empty");
+            }
             
-            if (videoUrl.contains("example.com/stream")) {
-                return videoUrl;
-            } else if (videoUrl.contains("youtube.com/watch") || videoUrl.contains("youtu.be/")) {
-                StreamInfo info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl);
+            try {
+                Log.d(TAG, "Extracting video stream for: " + url);
+                StreamInfo streamInfo = StreamInfo.getInfo(ServiceList.YouTube, url);
                 
-                // Try to get the best quality video stream
-                if (!info.getVideoStreams().isEmpty()) {
-                    // Get the highest quality stream available
-                    return info.getVideoStreams().get(0).getUrl();
-                } else if (!info.getVideoOnlyStreams().isEmpty()) {
-                    // Fallback to video-only streams if regular video streams aren't available
-                    return info.getVideoOnlyStreams().get(0).getUrl();
-                } else if (!info.getAudioStreams().isEmpty()) {
-                    // Last resort: audio only
-                    return info.getAudioStreams().get(0).getUrl();
+                if (streamInfo == null) {
+                    throw new Exception("Failed to get stream information");
                 }
+                
+                // Try video streams first (with audio)
+                if (!streamInfo.getVideoStreams().isEmpty()) {
+                    String streamUrl = streamInfo.getVideoStreams().get(0).getUrl();
+                    Log.d(TAG, "Found video stream: " + streamUrl);
+                    return streamUrl;
+                }
+                
+                // Try video-only streams
+                if (!streamInfo.getVideoOnlyStreams().isEmpty()) {
+                    String streamUrl = streamInfo.getVideoOnlyStreams().get(0).getUrl();
+                    Log.d(TAG, "Found video-only stream: " + streamUrl);
+                    return streamUrl;
+                }
+                
+                // Fallback to audio streams
+                if (!streamInfo.getAudioStreams().isEmpty()) {
+                    String streamUrl = streamInfo.getAudioStreams().get(0).getUrl();
+                    Log.d(TAG, "Found audio stream: " + streamUrl);
+                    return streamUrl;
+                }
+                
                 throw new Exception("No playable streams found for this video");
-            } else {
-                // For direct video URLs, return as-is
-                return videoUrl;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to extract video stream", e);
+                throw new Exception("Video stream extraction failed: " + e.getMessage(), e);
             }
         }
     }
+
+    //endregion
+
+    private Runnable progressUpdateRunnable;
 }
