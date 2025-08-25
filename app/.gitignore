@@ -1,1 +1,4 @@
 /build
+.androidide/editor
+openedFiles.json
+openedFiles.json.bak
