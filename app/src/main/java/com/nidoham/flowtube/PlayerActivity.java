@@ -173,8 +173,8 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
     // Player management
     private void initializePlayer() {
         player = new ExoPlayer.Builder(this).build();
-        binding.exoPlayerView.setPlayer(player);
-        binding.exoPlayerView.setUseController(false);
+        binding.playerView.setPlayer(player);
+        binding.playerView.setUseController(false);
         player.addListener(this);
     }
 
@@ -280,11 +280,10 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
         
         // Only set from intent if values exist, otherwise they'll be set from extracted data
         if (title != null && !title.isEmpty()) {
-            setTextIfNotNull(binding.videoTitle, title);
-            setTextIfNotNull(binding.landscapeVideoTitle, title);
+            setTextIfNotNull(binding.txtTitle, title);
         }
         if (channelName != null && !channelName.isEmpty()) {
-            setTextIfNotNull(binding.channelName, channelName);
+            setTextIfNotNull(binding.txtChannelName, channelName);
         }
     }
 
@@ -292,35 +291,38 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
         try {
             // Update title if not already set from intent
             if (streamInfo.getName() != null && !streamInfo.getName().isEmpty()) {
-                setTextIfNotNull(binding.videoTitle, streamInfo.getName());
-                setTextIfNotNull(binding.landscapeVideoTitle, streamInfo.getName());
+                setTextIfNotNull(binding.txtTitle, streamInfo.getName());
             }
 
             // Update channel name if available
             if (streamInfo.getUploaderName() != null && !streamInfo.getUploaderName().isEmpty()) {
-                setTextIfNotNull(binding.channelName, streamInfo.getUploaderName());
+                setTextIfNotNull(binding.txtChannelName, streamInfo.getUploaderName());
             }
 
-            // Update view count if available
-            if (streamInfo.getViewCount() > 0) {
-                String viewText = formatViewCount(streamInfo.getViewCount()) + " views";
-                setTextIfNotNull(binding.viewCount, viewText);
-            }
-
-            // Update upload date if available
-            if (streamInfo.getUploadDate() != null) {
-                DateWrapper uploadDate = streamInfo.getUploadDate();
-                if (uploadDate != null && uploadDate.date() != null) {
-                    long uploadTimeMs = uploadDate.date().getTimeInMillis();
-                    setTextIfNotNull(binding.uploadTime, formatTimeAgo(uploadTimeMs));
-                } else {
-                    setTextIfNotNull(binding.uploadTime, streamInfo.getUploadDate().date().toString());
+            // Update view count and upload date metadata
+            if (streamInfo.getViewCount() > 0 || streamInfo.getUploadDate() != null) {
+                String metaText = "";
+                if (streamInfo.getViewCount() > 0) {
+                    metaText = formatViewCount(streamInfo.getViewCount()) + " views";
                 }
+                if (streamInfo.getUploadDate() != null) {
+                    DateWrapper uploadDate = streamInfo.getUploadDate();
+                    if (uploadDate != null && uploadDate.date() != null) {
+                        long uploadTimeMs = uploadDate.date().getTimeInMillis();
+                        String timeAgo = formatTimeAgo(uploadTimeMs);
+                        if (!metaText.isEmpty()) {
+                            metaText += " • " + timeAgo;
+                        } else {
+                            metaText = timeAgo;
+                        }
+                    }
+                }
+                setTextIfNotNull(binding.txtMeta, metaText);
             }
 
             // Update like count if available
             if (streamInfo.getLikeCount() > 0) {
-                setTextIfNotNull(binding.likeCount, formatViewCount(streamInfo.getLikeCount()));
+                setTextIfNotNull(binding.txtLikeCount, formatViewCount(streamInfo.getLikeCount()));
             }
 
             Log.d(TAG, "Video metadata populated successfully");
@@ -430,19 +432,25 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
 
     // UI event handlers
     private void setupEventListeners() {
-        setClickListenerIfNotNull(binding.exoPlayerView, v -> toggleControlsVisibility());
-        setClickListenerIfNotNull(binding.centerPlayButton, v -> togglePlayPause());
-        setClickListenerIfNotNull(binding.previousButton, v -> seekBackward());
-        setClickListenerIfNotNull(binding.nextButton, v -> seekForward());
-        setClickListenerIfNotNull(binding.fullscreenButton, v -> toggleFullscreen());
-        setClickListenerIfNotNull(binding.exitFullscreenButton, v -> exitFullscreen());
+        setClickListenerIfNotNull(binding.playerView, v -> toggleControlsVisibility());
+        setClickListenerIfNotNull(binding.btnPlayPause, v -> togglePlayPause());
+        setClickListenerIfNotNull(binding.btnReplay10, v -> seekBackward());
+        setClickListenerIfNotNull(binding.btnForward10, v -> seekForward());
+        setClickListenerIfNotNull(binding.btnOrientation, v -> toggleFullscreen());
+        setClickListenerIfNotNull(binding.btnBack, v -> {
+            if (isFullscreen) {
+                exitFullscreen();
+            } else {
+                finish();
+            }
+        });
         
         setupSeekBar();
     }
 
     private void setupSeekBar() {
-        if (binding.seekBar != null) {
-            binding.seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        if (binding.videoProgress != null) {
+            binding.videoProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                     if (fromUser && player != null) {
@@ -497,28 +505,43 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
         isFullscreen = false;
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         showSystemUI();
-        int height = (int) (VIDEO_HEIGHT_DP * getResources().getDisplayMetrics().density);
-        adjustVideoPlayerLayout(ViewGroup.LayoutParams.MATCH_PARENT, height);
+        adjustVideoPlayerLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         showVideoDetails();
         showControls();
         stopControlsHideTimer();
     }
 
     private void adjustVideoPlayerLayout(int width, int height) {
-        if (binding.videoPlayerContainer != null) {
-            ViewGroup.LayoutParams params = binding.videoPlayerContainer.getLayoutParams();
+        if (binding.playerView != null) {
+            ViewGroup.LayoutParams params = binding.playerView.getLayoutParams();
             params.width = width;
             params.height = height;
-            binding.videoPlayerContainer.setLayoutParams(params);
+            binding.playerView.setLayoutParams(params);
         }
     }
 
     private void hideVideoDetails() {
-        setVisibilityIfNotNull(binding.videoDetailsContainer, View.GONE);
+        // In landscape mode, hide all content below the player
+        setVisibilityIfNotNull(binding.videoProgress, View.GONE);
+        setVisibilityIfNotNull(binding.txtTitle, View.GONE);
+        setVisibilityIfNotNull(binding.txtMeta, View.GONE);
+        setVisibilityIfNotNull(binding.rowChannel, View.GONE);
+        setVisibilityIfNotNull(binding.rowActionsScroll, View.GONE);
+        setVisibilityIfNotNull(binding.txtCommentsCount, View.GONE);
+        setVisibilityIfNotNull(binding.btnCommentsExpand, View.GONE);
+        setVisibilityIfNotNull(binding.rvRelated, View.GONE);
     }
 
     private void showVideoDetails() {
-        setVisibilityIfNotNull(binding.videoDetailsContainer, View.VISIBLE);
+        // In portrait mode, show all content below the player
+        setVisibilityIfNotNull(binding.videoProgress, View.VISIBLE);
+        setVisibilityIfNotNull(binding.txtTitle, View.VISIBLE);
+        setVisibilityIfNotNull(binding.txtMeta, View.VISIBLE);
+        setVisibilityIfNotNull(binding.rowChannel, View.VISIBLE);
+        setVisibilityIfNotNull(binding.rowActionsScroll, View.VISIBLE);
+        setVisibilityIfNotNull(binding.txtCommentsCount, View.VISIBLE);
+        setVisibilityIfNotNull(binding.btnCommentsExpand, View.VISIBLE);
+        setVisibilityIfNotNull(binding.rvRelated, View.VISIBLE);
     }
 
     private void hideSystemUI() {
@@ -568,14 +591,22 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
     }
 
     private void showControls() {
-        setVisibilityIfNotNull(binding.videoControlsOverlay, View.VISIBLE);
+        // Show player controls overlay
+        View playerViewOverlay = binding.playerView.getOverlayFrameLayout();
+        if (playerViewOverlay != null) {
+            playerViewOverlay.setVisibility(View.VISIBLE);
+        }
         controlsVisible = true;
         mainHandler.removeCallbacks(updateProgressRunnable);
         mainHandler.post(updateProgressRunnable);
     }
 
     private void hideControls() {
-        setVisibilityIfNotNull(binding.videoControlsOverlay, View.GONE);
+        // Hide player controls overlay
+        View playerViewOverlay = binding.playerView.getOverlayFrameLayout();
+        if (playerViewOverlay != null) {
+            playerViewOverlay.setVisibility(View.GONE);
+        }
         controlsVisible = false;
         mainHandler.removeCallbacks(updateProgressRunnable);
     }
@@ -603,14 +634,19 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
         long currentPosition = player.getCurrentPosition();
         long duration = player.getDuration();
         
-        if (duration > 0 && binding.seekBar != null) {
+        if (duration > 0 && binding.videoProgress != null) {
             int progress = (int) ((currentPosition * 100) / duration);
-            binding.seekBar.setProgress(progress);
+            binding.videoProgress.setProgress(progress);
         }
         
-        if (binding.timeDisplay != null) {
-            String timeText = formatTime(currentPosition) + " / " + formatTime(duration);
-            binding.timeDisplay.setText(timeText);
+        // Update time displays
+        if (binding.txtCurrentTime != null) {
+            binding.txtCurrentTime.setText(formatTime(currentPosition));
+        }
+        
+        if (binding.txtRemainingTime != null && duration > 0) {
+            long remainingTime = duration - currentPosition;
+            binding.txtRemainingTime.setText("-" + formatTime(remainingTime));
         }
     }
 
@@ -628,11 +664,12 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
 
     // Loading states
     private void showLoadingState() {
-        setVisibilityIfNotNull(binding.progressBar, View.VISIBLE);
+        // Show loading indicator - using the progress bar from layout
+        setVisibilityIfNotNull(binding.videoProgress, View.VISIBLE);
     }
 
     private void hideLoadingState() {
-        setVisibilityIfNotNull(binding.progressBar, View.GONE);
+        // Loading is handled by progress updates, so no specific action needed here
     }
 
     // Error handling
@@ -651,7 +688,7 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
             loadVideoData();
             
             if (player != null) {
-                binding.exoPlayerView.setPlayer(player);
+                binding.playerView.setPlayer(player);
                 seekTo(playbackPosition);
                 player.setPlayWhenReady(playWhenReady);
             }
@@ -686,8 +723,8 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
                 hideLoadingState();
                 stopControlsHideTimer();
                 showControls();
-                if (binding.centerPlayButton != null) {
-                    binding.centerPlayButton.setImageResource(R.drawable.ic_replay);
+                if (binding.btnPlayPause != null) {
+                    binding.btnPlayPause.setImageResource(R.drawable.ic_replay);
                 }
                 break;
         }
@@ -695,9 +732,9 @@ public class PlayerActivity extends AppCompatActivity implements Player.Listener
 
     @Override
     public void onIsPlayingChanged(boolean isPlaying) {
-        if (binding.centerPlayButton != null) {
-            int iconRes = isPlaying ? R.drawable.ic_pause_circle_filled : R.drawable.ic_play_circle_filled;
-            binding.centerPlayButton.setImageResource(iconRes);
+        if (binding.btnPlayPause != null) {
+            int iconRes = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play_arrow;
+            binding.btnPlayPause.setImageResource(iconRes);
         }
         
         if (isPlaying) {

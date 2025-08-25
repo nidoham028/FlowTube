@@ -1,0 +1,50 @@
+{
+  "allFiles": [
+    {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java",
+      "selection": {
+        "end": {
+          "column": 40,
+          "index": 25614,
+          "line": 726
+        },
+        "start": {
+          "column": 40,
+          "index": 25614,
+          "line": 726
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout/activity_player.xml",
+      "selection": {
+        "end": {
+          "column": 35,
+          "index": 4251,
+          "line": 91
+        },
+        "start": {
+          "column": 35,
+          "index": 4251,
+          "line": 91
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout-land/activity_player.xml",
+      "selection": {
+        "end": {
+          "column": 44,
+          "index": 6203,
+          "line": 130
+        },
+        "start": {
+          "column": 44,
+          "index": 6203,
+          "line": 130
+        }
+      }
+    }
+  ],
+  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout-land/activity_player.xml"
+}

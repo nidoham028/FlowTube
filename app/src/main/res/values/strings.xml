@@ -9,4 +9,16 @@
     <string name="btn_nav_subscription">Subscription</string>
     <string name="btn_nav_library">Library</string>
     <string name="btn_nav_community">Community</string>
+    
+    <string name="back_button" translatable="false">Back</string>
+    <string name="cast_button" translatable="false">Cast</string>
+    <string name="cc_button" translatable="false">CC</string>
+    <string name="settings_button" translatable="false">Settings</string>
+    <string name="replay_10_seconds" translatable="false">Replay 10 Seconds</string>
+    <string name="play_pause_button" translatable="false">Play Pause</string>
+    <string name="forward_10_seconds" translatable="false">Forward 10 Seconds</string>
+    <string name="orientation_toggle" translatable="false">Rotate Screen</string>
+    <string name="channel_avatar" translatable="false">Channel Avatar</string>
+    <string name="expand_comments" translatable="false">Expand Comments</string>
+
 </resources>
