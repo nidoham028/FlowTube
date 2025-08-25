@@ -18,9 +18,9 @@
 
         <androidx.constraintlayout.widget.ConstraintLayout
              android:layout_height="match_parent"
-             android:layout_width="match_parent">
+             android:layout_width="match_parent"
+             android:id="@+id/controlsOverlay">
 
-            <!-- Top Navigation -->
             <ImageButton
                  android:layout_height="48dp"
                  android:layout_width="48dp"
@@ -44,7 +44,6 @@
                  android:id="@+id/toggleAutoplay"
                  android:text="Autoplay" />
 
-            <!-- Top Right Controls -->
             <ImageButton
                  android:layout_height="48dp"
                  android:layout_width="48dp"
@@ -81,54 +80,52 @@
                  android:layout_marginTop="8dp"
                  android:id="@+id/btnSettings" />
 
-            <!-- Center Play Controls -->
             <ImageButton
                  android:layout_height="48dp"
                  android:layout_width="48dp"
-                 android:scaleType="centerCrop"
-                 android:padding="8dp"
-                 android:layout_marginTop="60dp"
-                 android:contentDescription="@string/replay_10_seconds"
                  android:src="@drawable/ic_replay"
+                 android:padding="8dp"
+                 app:layout_constraintEnd_toStartOf="@id/btnPlayPause"
+                 android:layout_marginTop="60dp"
+                 app:layout_constraintBottom_toTopOf="@id/txtCurrentTime"
+                 android:scaleType="centerCrop"
+                 android:contentDescription="@string/replay_10_seconds"
                  android:background="?attr/selectableItemBackgroundBorderless"
                  app:layout_constraintTop_toTopOf="parent"
                  app:layout_constraintStart_toStartOf="parent"
-                 app:layout_constraintEnd_toStartOf="@id/btnPlayPause"
-                 app:layout_constraintBottom_toTopOf="@id/txtCurrentTime"
                  app:layout_constraintHorizontal_chainStyle="packed"
                  android:id="@+id/btnReplay10" />
 
             <ImageButton
                  android:layout_height="55dp"
                  android:layout_width="55dp"
-                 android:padding="8dp"
-                 android:layout_marginStart="60dp"
                  android:layout_marginEnd="60dp"
-                 android:contentDescription="@string/play_pause_button"
-                 android:scaleType="centerCrop"
                  android:src="@drawable/ic_play_arrow"
-                 android:background="?attr/selectableItemBackgroundBorderless"
-                 app:layout_constraintTop_toTopOf="@id/btnReplay10"
+                 android:padding="8dp"
                  app:layout_constraintStart_toEndOf="@id/btnReplay10"
                  app:layout_constraintEnd_toStartOf="@id/btnForward10"
                  app:layout_constraintBottom_toBottomOf="@id/btnReplay10"
+                 android:layout_marginStart="60dp"
+                 android:contentDescription="@string/play_pause_button"
+                 android:scaleType="centerCrop"
+                 android:background="?attr/selectableItemBackgroundBorderless"
+                 app:layout_constraintTop_toTopOf="@id/btnReplay10"
                  android:id="@+id/btnPlayPause" />
 
             <ImageButton
                  android:layout_height="48dp"
                  android:layout_width="48dp"
-                 android:padding="8dp"
                  android:scaleType="centerCrop"
                  android:contentDescription="@string/forward_10_seconds"
                  android:src="@drawable/ic_forward"
                  android:background="?attr/selectableItemBackgroundBorderless"
                  app:layout_constraintTop_toTopOf="@id/btnReplay10"
+                 android:padding="8dp"
                  app:layout_constraintStart_toEndOf="@id/btnPlayPause"
                  app:layout_constraintEnd_toEndOf="parent"
                  app:layout_constraintBottom_toBottomOf="@id/btnReplay10"
                  android:id="@+id/btnForward10" />
 
-            <!-- Bottom Controls -->
             <TextView
                  android:layout_height="wrap_content"
                  android:layout_width="wrap_content"
@@ -167,59 +164,63 @@
 
     </com.google.android.exoplayer2.ui.PlayerView>
 
-    <!-- Video Progress Bar -->
     <SeekBar
          android:layout_height="wrap_content"
          android:layout_width="0dp"
-         android:layout_marginStart="16dp"
          android:layout_marginEnd="16dp"
          app:layout_constraintStart_toStartOf="parent"
          app:layout_constraintEnd_toEndOf="parent"
          style="?android:attr/progressBarStyleHorizontal"
          android:layout_marginTop="8dp"
+         android:layout_marginStart="16dp"
          app:layout_constraintTop_toBottomOf="@id/playerView"
          android:id="@+id/videoProgress" />
 
-    <!-- Video Title -->
-    <TextView
+    <LinearLayout
          android:layout_height="wrap_content"
-         android:layout_width="0dp"
-         android:layout_marginStart="16dp"
-         android:layout_marginEnd="16dp"
-         android:ellipsize="end"
-         android:textSize="18sp"
-         android:textColor="@android:color/white"
-         android:layout_marginTop="16dp"
+         android:layout_width="match_parent"
+         android:orientation="vertical"
          app:layout_constraintTop_toBottomOf="@id/videoProgress"
-         android:textAppearance="@style/TextAppearance.AppCompat.Large"
-         app:layout_constraintStart_toStartOf="parent"
-         app:layout_constraintEnd_toEndOf="parent"
-         android:maxLines="2"
-         android:id="@+id/txtTitle"
-         android:text="Video Title Goes Here"
-         android:textStyle="bold" />
+         android:id="@+id/videoInfoContainer">
 
-    <!-- Video Metadata -->
-    <TextView
-         android:layout_height="wrap_content"
-         android:layout_width="wrap_content"
-         app:layout_constraintStart_toStartOf="parent"
-         android:textSize="13sp"
-         android:textColor="@android:color/darker_gray"
-         android:layout_marginTop="8dp"
-         android:layout_marginStart="16dp"
-         app:layout_constraintTop_toBottomOf="@id/txtTitle"
-         android:id="@+id/txtMeta"
-         android:text="1,234,567 views • 2 days ago" />
+        <TextView
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:layout_marginEnd="16dp"
+             android:ellipsize="end"
+             android:textSize="18sp"
+             android:textColor="@android:color/white"
+             android:layout_marginTop="16dp"
+             android:layout_marginStart="16dp"
+             android:textAppearance="@style/TextAppearance.AppCompat.Large"
+             app:layout_constraintStart_toStartOf="parent"
+             app:layout_constraintEnd_toEndOf="parent"
+             android:maxLines="2"
+             android:id="@+id/txtTitle"
+             android:text="Video Title Goes Here"
+             android:textStyle="bold" />
 
-    <!-- Channel Row -->
+        <TextView
+             android:layout_height="wrap_content"
+             android:layout_width="wrap_content"
+             app:layout_constraintStart_toStartOf="parent"
+             android:textSize="13sp"
+             android:textColor="@android:color/darker_gray"
+             android:layout_marginTop="8dp"
+             android:layout_marginStart="16dp"
+             app:layout_constraintTop_toBottomOf="@id/txtTitle"
+             android:id="@+id/txtMeta"
+             android:text="1,234,567 views • 2 days ago" />
+
+    </LinearLayout>
+
     <androidx.constraintlayout.widget.ConstraintLayout
          android:layout_height="wrap_content"
          android:layout_width="0dp"
          app:layout_constraintStart_toStartOf="parent"
          app:layout_constraintEnd_toEndOf="parent"
          android:layout_marginTop="16dp"
-         app:layout_constraintTop_toBottomOf="@id/txtMeta"
+         app:layout_constraintTop_toBottomOf="@id/videoInfoContainer"
          android:id="@+id/rowChannel">
 
         <ImageView
@@ -235,12 +236,12 @@
         <TextView
              android:layout_height="wrap_content"
              android:layout_width="0dp"
+             android:layout_marginEnd="8dp"
              app:layout_constraintTop_toTopOf="@id/imgAvatar"
              android:textColor="@android:color/white"
              app:layout_constraintStart_toEndOf="@id/imgAvatar"
              app:layout_constraintEnd_toStartOf="@id/btnSubscribe"
              android:layout_marginStart="16dp"
-             android:layout_marginEnd="8dp"
              android:id="@+id/txtChannelName"
              android:text="Channel Name"
              android:textStyle="bold" />
@@ -249,8 +250,8 @@
              android:layout_height="wrap_content"
              android:layout_width="0dp"
              app:layout_constraintStart_toStartOf="@id/txtChannelName"
-             app:layout_constraintEnd_toEndOf="@id/txtChannelName"
              android:textSize="12sp"
+             app:layout_constraintEnd_toEndOf="@id/txtChannelName"
              android:textColor="@android:color/darker_gray"
              app:layout_constraintTop_toBottomOf="@id/txtChannelName"
              android:id="@+id/txtSubscriberCount"
@@ -270,7 +271,6 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Action Buttons Horizontal Scroll -->
     <HorizontalScrollView
          android:layout_height="wrap_content"
          android:layout_width="0dp"
@@ -283,62 +283,62 @@
         <LinearLayout
              android:layout_height="wrap_content"
              android:layout_width="wrap_content"
-             android:paddingStart="16dp"
              android:paddingEnd="16dp"
-             android:orientation="horizontal"
              android:gravity="center_vertical"
+             android:orientation="horizontal"
+             android:paddingStart="16dp"
              android:id="@+id/rowActions">
 
             <Button
                  android:layout_height="wrap_content"
                  android:layout_width="wrap_content"
-                 style="@style/Widget.Material3.Button.TextButton"
                  android:textColor="@android:color/white"
+                 style="@style/Widget.Material3.Button.TextButton"
                  android:id="@+id/btnLike"
                  android:text="Like" />
 
             <TextView
                  android:layout_height="wrap_content"
                  android:layout_width="wrap_content"
+                 android:textSize="12sp"
                  android:textColor="@android:color/white"
                  android:layout_marginStart="4dp"
-                 android:textSize="12sp"
                  android:id="@+id/txtLikeCount"
                  android:text="123K" />
 
             <Button
                  android:layout_height="wrap_content"
                  android:layout_width="wrap_content"
-                 android:layout_marginStart="16dp"
-                 style="@style/Widget.Material3.Button.TextButton"
                  android:textColor="@android:color/white"
+                 style="@style/Widget.Material3.Button.TextButton"
+                 android:layout_marginStart="16dp"
                  android:id="@+id/btnDislike"
                  android:text="Dislike" />
 
             <Button
                  android:layout_height="wrap_content"
                  android:layout_width="wrap_content"
-                 android:layout_marginStart="16dp"
-                 style="@style/Widget.Material3.Button.TextButton"
                  android:textColor="@android:color/white"
+                 style="@style/Widget.Material3.Button.TextButton"
+                 android:layout_marginStart="16dp"
                  android:id="@+id/btnShare"
                  android:text="Share" />
 
             <Button
                  android:layout_height="wrap_content"
                  android:layout_width="wrap_content"
-                 android:layout_marginStart="16dp"
-                 style="@style/Widget.Material3.Button.TextButton"
                  android:textColor="@android:color/white"
+                 style="@style/Widget.Material3.Button.TextButton"
+                 android:layout_marginStart="16dp"
                  android:id="@+id/btnDownload"
                  android:text="Download" />
 
             <Button
                  android:layout_height="wrap_content"
                  android:layout_width="wrap_content"
-                 android:layout_marginStart="16dp"
-                 style="@style/Widget.Material3.Button.TextButton"
                  android:textColor="@android:color/white"
+                 style="@style/Widget.Material3.Button.TextButton"
+                 android:layout_marginStart="16dp"
                  android:id="@+id/btnSave"
                  android:text="Save" />
 
@@ -346,16 +346,15 @@
 
     </HorizontalScrollView>
 
-    <!-- Comments Section Header -->
     <TextView
          android:layout_height="wrap_content"
          android:layout_width="0dp"
+         android:layout_marginEnd="8dp"
          app:layout_constraintStart_toStartOf="parent"
          app:layout_constraintEnd_toStartOf="@id/btnCommentsExpand"
          android:textColor="@android:color/white"
          android:layout_marginTop="16dp"
          android:layout_marginStart="16dp"
-         android:layout_marginEnd="8dp"
          app:layout_constraintTop_toBottomOf="@id/rowActionsScroll"
          android:id="@+id/txtCommentsCount"
          android:text="Comments • count"
@@ -372,7 +371,6 @@
          app:layout_constraintBottom_toBottomOf="@id/txtCommentsCount"
          android:id="@+id/btnCommentsExpand" />
 
-    <!-- Related Videos / Comments RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
          android:layout_height="0dp"
          android:layout_width="0dp"

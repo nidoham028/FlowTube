@@ -19,7 +19,8 @@
 
         <androidx.constraintlayout.widget.ConstraintLayout
              android:layout_height="match_parent"
-             android:layout_width="match_parent">
+             android:layout_width="match_parent"
+             android:id="@+id/controlsOverlay">
 
             <ImageButton
                  android:layout_height="56dp"
@@ -134,11 +135,11 @@
                  app:layout_constraintStart_toEndOf="@id/btnReplay10"
                  app:layout_constraintEnd_toStartOf="@id/btnForward10"
                  app:layout_constraintBottom_toBottomOf="@id/btnReplay10"
-                 android:layout_marginHorizontal="60dp"
                  android:scaleType="centerCrop"
                  android:contentDescription="@string/play_pause_button"
                  android:background="?attr/selectableItemBackgroundBorderless"
                  app:layout_constraintTop_toTopOf="@id/btnReplay10"
+                 android:layout_marginHorizontal="60dp"
                  android:id="@+id/btnPlayPause" />
 
             <ImageButton

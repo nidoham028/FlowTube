@@ -4,14 +4,14 @@
       "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java",
       "selection": {
         "end": {
-          "column": 40,
-          "index": 25614,
-          "line": 726
+          "column": 13,
+          "index": 18579,
+          "line": 528
         },
         "start": {
-          "column": 40,
-          "index": 25614,
-          "line": 726
+          "column": 13,
+          "index": 18579,
+          "line": 528
         }
       }
     },
@@ -19,14 +19,14 @@
       "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout/activity_player.xml",
       "selection": {
         "end": {
-          "column": 35,
-          "index": 4251,
-          "line": 91
+          "column": 32,
+          "index": 8611,
+          "line": 181
         },
         "start": {
-          "column": 35,
-          "index": 4251,
-          "line": 91
+          "column": 32,
+          "index": 8611,
+          "line": 181
         }
       }
     },
@@ -34,17 +34,17 @@
       "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout-land/activity_player.xml",
       "selection": {
         "end": {
-          "column": 44,
-          "index": 6203,
-          "line": 130
+          "column": 47,
+          "index": 8241,
+          "line": 168
         },
         "start": {
-          "column": 44,
-          "index": 6203,
-          "line": 130
+          "column": 34,
+          "index": 8228,
+          "line": 168
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout-land/activity_player.xml"
+  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java"
 }
