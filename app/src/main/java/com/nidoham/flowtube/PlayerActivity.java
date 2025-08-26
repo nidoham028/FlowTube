@@ -34,12 +34,14 @@ public class PlayerActivity extends AppCompatActivity {
     public static final String EXTRA_VIDEO_TITLE = "video_title";
     public static final String EXTRA_CHANNEL_NAME = "channel_name";
     public static final String EXTRA_PLAYBACK_POSITION = "playback_position";
-    public static final String EXTRA_IS_FULLSCREEN = "is_fullscreen";
+    public static final String EXTRA_DIRECT_VIDEO_URL = "direct_video_url";
 
     private String videoUrl = "";
     private String videoTitle = "";
     private String channelName = "";
     private long playbackPosition = 0;
+    private String directVideoUrl = null;
+    private boolean isFirstCreate = true;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -49,257 +51,220 @@ public class PlayerActivity extends AppCompatActivity {
             binding = ActivityPlayerBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
         } catch (Exception e) {
-            Toast.makeText(this, "Failed to load player layout: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Failed to inflate layout: " + e.getMessage(), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
 
+        setupSystemUI();
+
+        playerViewModel = new ViewModelProvider(this).get(PlayerViewModel.class);
+
+        if (savedInstanceState != null) {
+            videoUrl = safeGetString(savedInstanceState, EXTRA_VIDEO_URL, "");
+            videoTitle = safeGetString(savedInstanceState, EXTRA_VIDEO_TITLE, "");
+            channelName = safeGetString(savedInstanceState, EXTRA_CHANNEL_NAME, "");
+            playbackPosition = savedInstanceState.getLong(EXTRA_PLAYBACK_POSITION, 0);
+            directVideoUrl = safeGetString(savedInstanceState, EXTRA_DIRECT_VIDEO_URL, null);
+            isFirstCreate = false;
+        } else {
+            Intent intent = getIntent();
+            if (intent != null) {
+                videoUrl = safeGetString(intent, EXTRA_VIDEO_URL, "");
+                videoTitle = safeGetString(intent, EXTRA_VIDEO_TITLE, "");
+                channelName = safeGetString(intent, EXTRA_CHANNEL_NAME, "");
+            }
+            playbackPosition = 0;
+            directVideoUrl = null;
+            isFirstCreate = true;
+        }
+
+        playerViewModel.initPlayer(this);
+        final ExoPlayer player = playerViewModel.getPlayer();
+
+        // Always bind player after orientation change
         try {
-            setupSystemUI();
+            binding.playerView.setPlayer(player);
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to attach player: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
 
-            playerViewModel = new ViewModelProvider(this).get(PlayerViewModel.class);
-
-            // Restore state or get from Intent
-            if (savedInstanceState != null) {
-                videoUrl = safeGetString(savedInstanceState, EXTRA_VIDEO_URL, "");
-                videoTitle = safeGetString(savedInstanceState, EXTRA_VIDEO_TITLE, "");
-                channelName = safeGetString(savedInstanceState, EXTRA_CHANNEL_NAME, "");
-                playbackPosition = savedInstanceState.getLong(EXTRA_PLAYBACK_POSITION, 0);
-                isFullscreen = savedInstanceState.getBoolean(EXTRA_IS_FULLSCREEN, false);
-            } else {
-                Intent intent = getIntent();
-                if (intent != null) {
-                    videoUrl = safeGetString(intent, EXTRA_VIDEO_URL, "");
-                    videoTitle = safeGetString(intent, EXTRA_VIDEO_TITLE, "");
-                    channelName = safeGetString(intent, EXTRA_CHANNEL_NAME, "");
-                }
-            }
-
-            playerViewModel.initPlayer(this);
-            final ExoPlayer player;
-            try {
-                player = playerViewModel.getPlayer();
-                binding.playerView.setPlayer(player);
-            } catch (Exception e) {
-                Toast.makeText(this, "Player creation failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                finish();
-                return;
-            }
-
-            // Only load media if no media loaded
-            if (player != null && player.getMediaItemCount() == 0) {
-                if (videoUrl != null && !videoUrl.isEmpty() && isYouTubeUrl(videoUrl)) {
-                    try {
-                        binding.loadingIndicator.setVisibility(View.VISIBLE);
-                        final long finalPlaybackPosition = playbackPosition;
-                        YouTubeDirectLink.getDirectLink(this, videoUrl, new YouTubeDirectLink.DirectLinkCallback() {
-                            @Override
-                            public void onSuccess(String directUrl) {
-                                mainHandler.post(() -> {
-                                    try {
-                                        if (!isDestroyed && playerViewModel != null) {
-                                            binding.loadingIndicator.setVisibility(View.GONE);
-                                            playerViewModel.loadMedia(directUrl);
-                                            if (finalPlaybackPosition > 0) {
-                                                player.seekTo(finalPlaybackPosition);
-                                            }
-                                        }
-                                    } catch (Exception e) {
-                                        Toast.makeText(PlayerActivity.this, "Failed to start video: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                                        finish();
-                                    }
-                                });
-                            }
-
-                            @Override
-                            public void onError(Exception e) {
-                                mainHandler.post(() -> {
+        // Only load video URL ONCE, use saved directVideoUrl after orientation change
+        if (isFirstCreate) {
+            if (videoUrl != null && !videoUrl.isEmpty() && isYouTubeUrl(videoUrl)) {
+                binding.loadingIndicator.setVisibility(View.VISIBLE);
+                final long finalPlaybackPosition = playbackPosition;
+                YouTubeDirectLink.getDirectLink(this, videoUrl, new YouTubeDirectLink.DirectLinkCallback() {
+                    @Override
+                    public void onSuccess(String directUrl) {
+                        mainHandler.post(() -> {
+                            try {
+                                if (!isDestroyed && playerViewModel != null) {
+                                    directVideoUrl = directUrl;
                                     binding.loadingIndicator.setVisibility(View.GONE);
-                                    Toast.makeText(PlayerActivity.this, "Failed to load video: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                                    finish();
-                                });
+                                    playerViewModel.loadMedia(directUrl);
+                                    if (finalPlaybackPosition > 0) player.seekTo(finalPlaybackPosition);
+                                }
+                            } catch (Exception e) {
+                                Toast.makeText(PlayerActivity.this, "Failed to start video: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                finish();
                             }
                         });
-                    } catch (Exception e) {
-                        binding.loadingIndicator.setVisibility(View.GONE);
-                        Toast.makeText(this, "Failed to fetch YouTube link: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        finish();
-                        return;
                     }
-                } else if (videoUrl != null && !videoUrl.isEmpty()) {
-                    try {
-                        binding.loadingIndicator.setVisibility(View.VISIBLE);
-                        playerViewModel.loadMedia(videoUrl);
-                        if (playbackPosition > 0) {
-                            player.seekTo(playbackPosition);
-                        }
-                        binding.loadingIndicator.setVisibility(View.GONE);
-                    } catch (Exception e) {
-                        binding.loadingIndicator.setVisibility(View.GONE);
-                        Toast.makeText(this, "Failed to load video: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        finish();
-                        return;
+                    @Override
+                    public void onError(Exception e) {
+                        mainHandler.post(() -> {
+                            binding.loadingIndicator.setVisibility(View.GONE);
+                            Toast.makeText(PlayerActivity.this, "Failed to load video: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            finish();
+                        });
                     }
-                } else {
-                    Toast.makeText(this, "Invalid video URL", Toast.LENGTH_LONG).show();
-                    finish();
-                    return;
-                }
-            } else if (player != null) {
-                // Media already loaded, just restore position
+                });
+            } else if (videoUrl != null && !videoUrl.isEmpty()) {
+                binding.loadingIndicator.setVisibility(View.VISIBLE);
                 try {
-                    if (playbackPosition > 0) {
-                        player.seekTo(playbackPosition);
-                    }
+                    directVideoUrl = videoUrl;
+                    playerViewModel.loadMedia(videoUrl);
+                    if (playbackPosition > 0) player.seekTo(playbackPosition);
                 } catch (Exception e) {
-                    Toast.makeText(this, "Failed to restore video position: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Failed to load video: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    finish();
                 }
+                binding.loadingIndicator.setVisibility(View.GONE);
+            } else {
+                Toast.makeText(this, "Invalid video URL", Toast.LENGTH_LONG).show();
+                finish();
             }
-
-            // Play/Pause Button
-            safeSetOnClickListener(binding.btnPlayPause, v -> {
-                try {
-                    if (player.isPlaying()) {
-                        playerViewModel.pause();
-                    } else {
-                        playerViewModel.play();
-                    }
-                } catch (Exception e) {
-                    Toast.makeText(this, "Player error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            // Replay 10
-            safeSetOnClickListener(binding.btnReplay10, v -> {
-                try {
-                    final long pos = player.getCurrentPosition();
-                    player.seekTo(Math.max(pos - 10000, 0));
-                } catch (Exception e) {
-                    Toast.makeText(this, "Failed to replay: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            // Forward 10
-            safeSetOnClickListener(binding.btnForward10, v -> {
-                try {
-                    final long pos = player.getCurrentPosition();
-                    final long duration = player.getDuration();
-                    player.seekTo(Math.min(pos + 10000, duration));
-                } catch (Exception e) {
-                    Toast.makeText(this, "Failed to forward: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            // Orientation Button
-            safeSetOnClickListener(binding.btnOrientation, v -> {
-                try {
-                    if (getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
-                        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                        isFullscreen = false;
-                    } else {
-                        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-                        isFullscreen = true;
-                        hideSystemUI();
-                    }
-                } catch (Exception e) {
-                    Toast.makeText(this, "Failed to change orientation: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            // Back Button
-            safeSetOnClickListener(binding.btnBack, v -> {
-                try {
-                    finish();
-                } catch (Exception e) {
-                    Toast.makeText(this, "Failed to exit: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            // SeekBar setup
-            final SeekBar seekBar = binding.videoProgress;
-            seekBar.setMax(1000);
-
-            final ExoPlayer.Listener progressListener = new Player.Listener() {
-                @Override
-                public void onIsPlayingChanged(boolean isPlaying) {
-                    try {
-                        updatePlayPauseButton(player.isPlaying());
-                    } catch (Exception ignored) {}
-                }
-                @Override
-                public void onPlaybackStateChanged(int state) {
-                    try {
-                        updateSeekBar(player, seekBar);
-                    } catch (Exception ignored) {}
-                }
-                @Override
-                public void onPositionDiscontinuity(Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
-                    try {
-                        updateSeekBar(player, seekBar);
-                    } catch (Exception ignored) {}
-                }
-            };
+        } else {
             try {
-                player.addListener(progressListener);
-            } catch (Exception ignored) {}
-
-            mainHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        updateSeekBar(player, seekBar);
-                        if (!isDestroyed) mainHandler.postDelayed(this, 500);
-                    } catch (Exception ignored) {}
+                if (directVideoUrl != null && player.getMediaItemCount() == 0) {
+                    playerViewModel.loadMedia(directVideoUrl);
                 }
-            }, 500);
-
-            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                boolean wasPlaying = false;
-
-                @Override
-                public void onStartTrackingTouch(SeekBar seekBar) {
-                    try {
-                        wasPlaying = player.isPlaying();
-                        playerViewModel.pause();
-                    } catch (Exception ignored) {}
-                }
-
-                @Override
-                public void onStopTrackingTouch(SeekBar seekBar) {
-                    try {
-                        final int progress = seekBar.getProgress();
-                        final long duration = player.getDuration();
-                        if (duration > 0) {
-                            long seekTo = (progress * duration) / 1000;
-                            player.seekTo(seekTo);
-                        }
-                        if (wasPlaying) playerViewModel.play();
-                    } catch (Exception ignored) {}
-                }
-
-                @Override
-                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) { }
-            });
-
-            // Metadata display
-            safeSetText(binding.txtTitle, videoTitle != null ? videoTitle : "Untitled");
-            safeSetText(binding.txtChannelName, channelName != null ? channelName : "");
-
-            // Hide system UI if fullscreen
-            if (isFullscreen) hideSystemUI();
-
-        } catch (Exception e) {
-            Toast.makeText(this, "Critical error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            finish();
+                if (playbackPosition > 0) player.seekTo(playbackPosition);
+            } catch (Exception e) {
+                Toast.makeText(this, "Failed to restore video position: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
         }
+
+        // Play/Pause
+        safeSetOnClickListener(binding.btnPlayPause, v -> {
+            try {
+                if (player.isPlaying()) playerViewModel.pause();
+                else playerViewModel.play();
+            } catch (Exception e) {
+                Toast.makeText(this, "Player error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Replay 10
+        safeSetOnClickListener(binding.btnReplay10, v -> {
+            try {
+                final long pos = player.getCurrentPosition();
+                player.seekTo(Math.max(pos - 10000, 0));
+            } catch (Exception e) {
+                Toast.makeText(this, "Failed to replay: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Forward 10
+        safeSetOnClickListener(binding.btnForward10, v -> {
+            try {
+                final long pos = player.getCurrentPosition();
+                final long duration = player.getDuration();
+                player.seekTo(Math.min(pos + 10000, duration));
+            } catch (Exception e) {
+                Toast.makeText(this, "Failed to forward: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Orientation Button
+        safeSetOnClickListener(binding.btnOrientation, v -> {
+            try {
+                if (getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+                    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                    isFullscreen = false;
+                } else {
+                    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                    isFullscreen = true;
+                    hideSystemUI();
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "Failed to change orientation: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Back Button
+        safeSetOnClickListener(binding.btnBack, v -> {
+            try {
+                finish();
+            } catch (Exception e) {
+                Toast.makeText(this, "Failed to exit: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // SeekBar setup
+        final SeekBar seekBar = binding.videoProgress;
+        seekBar.setMax(1000);
+
+        final ExoPlayer.Listener progressListener = new Player.Listener() {
+            @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+                try { updatePlayPauseButton(player.isPlaying()); } catch (Exception ignored) {}
+            }
+            @Override
+            public void onPlaybackStateChanged(int state) {
+                try { updateSeekBar(player, seekBar); } catch (Exception ignored) {}
+            }
+            @Override
+            public void onPositionDiscontinuity(Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
+                try { updateSeekBar(player, seekBar); } catch (Exception ignored) {}
+            }
+        };
+        try { player.addListener(progressListener); } catch (Exception ignored) {}
+
+        mainHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    updateSeekBar(player, seekBar);
+                    if (!isDestroyed) mainHandler.postDelayed(this, 500);
+                } catch (Exception ignored) {}
+            }
+        }, 500);
+
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            boolean wasPlaying = false;
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                try { wasPlaying = player.isPlaying(); playerViewModel.pause(); } catch (Exception ignored) {}
+            }
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                try {
+                    final int progress = seekBar.getProgress();
+                    final long duration = player.getDuration();
+                    if (duration > 0) {
+                        long seekTo = (progress * duration) / 1000;
+                        player.seekTo(seekTo);
+                    }
+                    if (wasPlaying) playerViewModel.play();
+                } catch (Exception ignored) {}
+            }
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) { }
+        });
+
+        // Metadata display
+        safeSetText(binding.txtTitle, videoTitle != null ? videoTitle : "Untitled");
+        safeSetText(binding.txtChannelName, channelName != null ? channelName : "");
+
+        // Hide system UI if fullscreen
+        if (isFullscreen) hideSystemUI();
     }
 
     private boolean isYouTubeUrl(String url) {
-        try {
-            return url != null && (url.contains("youtube.com") || url.contains("youtu.be"));
-        } catch (Exception e) {
-            return false;
-        }
+        try { return url != null && (url.contains("youtube.com") || url.contains("youtu.be")); }
+        catch (Exception e) { return false; }
     }
 
     private void setupSystemUI() {
@@ -366,34 +331,26 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        try {
-            playerViewModel.pause();
-        } catch (Exception ignored) {}
+        try { playerViewModel.pause(); } catch (Exception ignored) {}
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        try {
-            playerViewModel.resume();
-        } catch (Exception ignored) {}
+        try { playerViewModel.resume(); } catch (Exception ignored) {}
     }
 
     @Override
     protected void onDestroy() {
         isDestroyed = true;
-        try {
-            playerViewModel.release();
-        } catch (Exception ignored) {}
+        try { playerViewModel.release(); } catch (Exception ignored) {}
         binding = null;
         super.onDestroy();
     }
 
     @Override
     public void onBackPressed() {
-        try {
-            finish();
-        } catch (Exception ignored) {}
+        try { finish(); } catch (Exception ignored) {}
     }
 
     @Override
@@ -407,39 +364,25 @@ public class PlayerActivity extends AppCompatActivity {
             outState.putString(EXTRA_VIDEO_URL, videoUrl);
             outState.putString(EXTRA_VIDEO_TITLE, videoTitle);
             outState.putString(EXTRA_CHANNEL_NAME, channelName);
-            outState.putBoolean(EXTRA_IS_FULLSCREEN, isFullscreen);
+            outState.putString(EXTRA_DIRECT_VIDEO_URL, directVideoUrl);
         } catch (Exception ignored) {}
     }
 
     // Helper: set text safely
     private void safeSetText(android.widget.TextView tv, String text) {
-        try {
-            if (tv != null) tv.setText(text);
-        } catch (Exception ignored) {}
+        try { if (tv != null) tv.setText(text); } catch (Exception ignored) {}
     }
-
     // Helper: set click listener safely
     private void safeSetOnClickListener(View view, View.OnClickListener listener) {
-        try {
-            if (view != null) view.setOnClickListener(listener);
-        } catch (Exception ignored) {}
+        try { if (view != null) view.setOnClickListener(listener); } catch (Exception ignored) {}
     }
-
     // Helper: get string extra safely
     private String safeGetString(Bundle bundle, String key, String defaultValue) {
-        try {
-            String result = bundle.getString(key);
-            return result != null ? result : defaultValue;
-        } catch (Exception e) {
-            return defaultValue;
-        }
+        try { String result = bundle.getString(key); return result != null ? result : defaultValue; }
+        catch (Exception e) { return defaultValue; }
     }
     private String safeGetString(Intent intent, String key, String defaultValue) {
-        try {
-            String result = intent.getStringExtra(key);
-            return result != null ? result : defaultValue;
-        } catch (Exception e) {
-            return defaultValue;
-        }
+        try { String result = intent.getStringExtra(key); return result != null ? result : defaultValue; }
+        catch (Exception e) { return defaultValue; }
     }
 }
