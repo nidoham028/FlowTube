@@ -5,22 +5,52 @@
     <!-- Network Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
-    <!-- Storage Permissions (legacy) -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28"
-        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     
     <!-- Wake Lock for background operations -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
     <!-- Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    
+    <!-- Notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- Media Playback Permissions -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    
+    <!-- Storage Permissions - Scoped Storage Approach -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        android:minSdkVersion="30"
+        tools:ignore="ScopedStorage" />
+    
+    <!-- Optional overlay permission for Picture-in-Picture enhancements -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Required for TV devices -->
-    <uses-feature android:name="android.software.leanback" android:required="true" />
-    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
-    <uses-feature android:name="android.hardware.faketouch" android:required="false" />
+    <!-- Device Feature Requirements -->
+    <uses-feature 
+        android:name="android.hardware.touchscreen" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.software.leanback" 
+        android:required="true" />
+    <uses-feature 
+        android:name="android.hardware.faketouch" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.software.webview" 
+        android:required="true" />
+    <uses-feature 
+        android:name="android.hardware.camera" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.microphone" 
+        android:required="false" />
 
     <application
         android:name=".App"
@@ -30,17 +60,20 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
+        android:banner="@drawable/app_banner"
         android:resizeableActivity="true"
         android:usesCleartextTraffic="false"
-        android:banner="@drawable/app_banner"
         tools:targetApi="31">
 
         <!-- Splash Activity -->
         <activity
             android:name=".SplashActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
+            android:launchMode="singleTop"
+            android:screenOrientation="unspecified"
+            android:windowSoftInputMode="adjustPan"
             android:resizeableActivity="true">
+            
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -80,7 +113,13 @@
             android:name=".PlayerActivity"
             android:exported="false"
             android:resizeableActivity="true"
-            android:screenOrientation="sensor" />
+            android:screenOrientation="unspecified" />
+
+        <activity
+            android:name=".SearchActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:screenOrientation="unspecified" />
 
         <!-- NewPipe ReCaptcha -->
         <activity
@@ -112,10 +151,5 @@
         </provider>
 
     </application>
-
-    <!-- Optional Features -->
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.microphone" android:required="false" />
-    <uses-feature android:name="android.software.webview" android:required="true" />
 
 </manifest>

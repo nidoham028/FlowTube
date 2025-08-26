@@ -1,5 +1,6 @@
 package com.nidoham.flowtube;
 
+import android.content.Intent;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import androidx.annotation.NonNull;
@@ -50,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Setup fragments
         setupFragments();
+        setupOnClickListener();
         
         // Setup ViewPager adapter
         ViewPagerAdapter adapter = new ViewPagerAdapter(this, fragments);
@@ -60,6 +62,12 @@ public class MainActivity extends AppCompatActivity {
 
         // Apply dynamic colors if available
         applyDynamicColors();
+    }
+    
+    private void setupOnClickListener() {
+    	binding.searchBtn.setOnClickListener(v-> {
+            startActivity(new Intent(getApplicationContext(), SearchActivity.class));
+        });
     }
 
     private void setupFragments() {

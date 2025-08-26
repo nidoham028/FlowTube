@@ -9,6 +9,11 @@
     <string name="btn_nav_subscription">Subscription</string>
     <string name="btn_nav_library">Library</string>
     <string name="btn_nav_community">Community</string>
+
+    <!-- Search Activity -->
+    <string name="search_no_results" translatable="false">No Results</string>
+    <string name="search_no_results_description" translatable="false">No Results Description</string>
+
     
     <string name="back_button" translatable="false">Back</string>
     <string name="cast_button" translatable="false">Cast</string>

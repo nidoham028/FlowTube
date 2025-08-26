@@ -12,10 +12,7 @@ plugins {
 
 // Version management
 ext {
-    appVersionCode = 2
-    appVersionName = "0.0.7-cheeta"
     
-    // Kotlin version
     kotlinVersion = "1.9.25"
     
     // AndroidX versions
@@ -55,8 +52,8 @@ android {
         minSdk 26
         targetSdk 34
         
-        versionCode getVersionCode()
-        versionName getVersionName()
+        versionCode 3
+        versionName "1.0.01-cheeta"
         
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         

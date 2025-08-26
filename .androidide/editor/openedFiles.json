@@ -1,0 +1,20 @@
+{
+  "allFiles": [
+    {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout/activity_search.xml",
+      "selection": {
+        "end": {
+          "column": 34,
+          "index": 2999,
+          "line": 63
+        },
+        "start": {
+          "column": 34,
+          "index": 2999,
+          "line": 63
+        }
+      }
+    }
+  ],
+  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout/activity_search.xml"
+}
