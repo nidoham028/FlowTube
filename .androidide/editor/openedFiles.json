@@ -1,20 +1,50 @@
 {
   "allFiles": [
     {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/SearchActivity.java",
+      "selection": {
+        "end": {
+          "column": 1,
+          "index": 25071,
+          "line": 662
+        },
+        "start": {
+          "column": 1,
+          "index": 25071,
+          "line": 662
+        }
+      }
+    },
+    {
       "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout/activity_search.xml",
       "selection": {
         "end": {
-          "column": 34,
-          "index": 2999,
-          "line": 63
+          "column": 43,
+          "index": 840,
+          "line": 19
         },
         "start": {
-          "column": 34,
-          "index": 2999,
-          "line": 63
+          "column": 43,
+          "index": 840,
+          "line": 19
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/adapter/SearchSuggestionsAdapter.java",
+      "selection": {
+        "end": {
+          "column": 1,
+          "index": 2252,
+          "line": 68
+        },
+        "start": {
+          "column": 1,
+          "index": 2252,
+          "line": 68
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout/activity_search.xml"
+  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/adapter/SearchSuggestionsAdapter.java"
 }

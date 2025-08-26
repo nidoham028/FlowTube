@@ -53,13 +53,17 @@ public class SearchSuggestionsAdapter extends RecyclerView.Adapter<SearchSuggest
     }
 
     static class SuggestionViewHolder extends RecyclerView.ViewHolder {
-        ImageView suggestionIcon;
+        // The ImageView from the layout doesn't have an ID and is not needed here.
+        // ImageView suggestionIcon; 
         TextView suggestionText;
 
         SuggestionViewHolder(@NonNull View itemView) {
             super(itemView);
-            suggestionIcon = itemView.findViewById(R.id.imgSuggestionIcon);
-            suggestionText = itemView.findViewById(R.id.txtSuggestion);
+            // The ImageView lookup is removed.
+            // suggestionIcon = itemView.findViewById(R.id.imgSuggestionIcon);
+            
+            // **FIX:** Use the correct ID from item_search_suggestion.xml
+            suggestionText = itemView.findViewById(R.id.suggestion_text);
         }
     }
 }

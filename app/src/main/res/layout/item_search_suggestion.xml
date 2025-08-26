@@ -1,28 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="12dp"
-    android:background="?android:attr/selectableItemBackground"
-    android:gravity="center_vertical">
+    android:gravity="center_vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="12dp"
+    android:background="?attr/selectableItemBackground">
 
     <ImageView
-        android:id="@+id/imgSuggestionIcon"
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:src="@drawable/ic_search"
-        android:layout_marginEnd="16dp"
-        android:contentDescription="Search suggestion" />
+        android:alpha="0.7"/>
 
     <TextView
-        android:id="@+id/txtSuggestion"
+        android:id="@+id/suggestion_text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:textColor="@android:color/white"
         android:textSize="16sp"
-        android:textColor="?android:attr/textColorPrimary"
-        android:singleLine="true"
-        android:ellipsize="end" />
-
+        tools:text="Search Suggestion Item"/>
 </LinearLayout>
