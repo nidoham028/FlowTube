@@ -15,6 +15,7 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.nidoham.flowtube.fragment.HomeFragment;
 import java.util.ArrayList;
 import java.util.List;
 
