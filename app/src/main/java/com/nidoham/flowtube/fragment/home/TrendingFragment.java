@@ -40,8 +40,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoItemClickListener {
 
     private static final String TAG = "TrendingFragment";
-    private static final int MINIMUM_VIDEO_DURATION = 60; // seconds
-    private static final int LOAD_MORE_THRESHOLD = 5; // items before end to trigger loading
+    private static final int MINIMUM_VIDEO_DURATION = 60;
+    private static final int LOAD_MORE_THRESHOLD = 5;
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long RETRY_DELAY_MS = 2000;
     private static final int TV_GRID_SPAN_COUNT = 3;
@@ -61,9 +61,8 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
     private int retryAttempts = 0;
     private String lastQuery = "";
     
-    // Android TV detection and layout management
     private boolean isAndroidTV = false;
-    private RecyclerView.LayoutManager layoutManager;
+    private GridLayoutManager gridLayoutManager;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -71,7 +70,6 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         mainHandler = new Handler(Looper.getMainLooper());
         detectAndroidTV();
         
-        // Add lifecycle observer for proper cleanup
         getLifecycle().addObserver(new DefaultLifecycleObserver() {
             @Override
             public void onDestroy(@NonNull LifecycleOwner owner) {
@@ -98,14 +96,18 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         
         initializeComponents();
         setupRecyclerView();
-        loadTrendingContent();
+        
+        if (videoList.isEmpty()) {
+            loadTrendingContent();
+        }
     }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        if (binding != null && !isDestroyed.get()) {
-            updateLayoutForConfiguration(newConfig);
+        
+        if (binding != null && !isDestroyed.get() && gridLayoutManager != null) {
+            updateLayoutManagerSpanCount(newConfig);
         }
     }
 
@@ -116,18 +118,23 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         }
     }
 
-    private void updateLayoutForConfiguration(Configuration config) {
-        if (layoutManager instanceof GridLayoutManager) {
-            GridLayoutManager gridLayoutManager = (GridLayoutManager) layoutManager;
-            
-            if (isAndroidTV) {
-                gridLayoutManager.setSpanCount(TV_GRID_SPAN_COUNT);
-            } else {
-                int spanCount = config.orientation == Configuration.ORIENTATION_LANDSCAPE 
-                    ? PHONE_LANDSCAPE_SPAN_COUNT : PHONE_PORTRAIT_SPAN_COUNT;
-                gridLayoutManager.setSpanCount(spanCount);
-            }
+    private void updateLayoutManagerSpanCount(Configuration config) {
+        int currentSpanCount = gridLayoutManager.getSpanCount();
+        int newSpanCount = calculateSpanCount(config);
+        
+        if (currentSpanCount != newSpanCount) {
+            gridLayoutManager.setSpanCount(newSpanCount);
         }
+    }
+
+    private int calculateSpanCount(Configuration config) {
+        if (isAndroidTV) {
+            return TV_GRID_SPAN_COUNT;
+        }
+        
+        return config.orientation == Configuration.ORIENTATION_LANDSCAPE 
+            ? PHONE_LANDSCAPE_SPAN_COUNT 
+            : PHONE_PORTRAIT_SPAN_COUNT;
     }
 
     private void initializeComponents() {
@@ -142,9 +149,8 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
                     android.R.color.holo_orange_light
                 );
                 
-                // Enhance for Android TV
                 if (isAndroidTV) {
-                    binding.swipeRefreshLayout.setEnabled(false); // Disable swipe refresh on TV
+                    binding.swipeRefreshLayout.setEnabled(false);
                 }
             }
         } catch (Exception e) {
@@ -160,20 +166,13 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         try {
             videoAdapter = new VideoAdapter(videoList, this);
             
-            // Determine appropriate layout manager based on device type and orientation
-            if (isAndroidTV) {
-                layoutManager = new GridLayoutManager(requireContext(), TV_GRID_SPAN_COUNT);
-            } else {
-                Configuration config = getResources().getConfiguration();
-                int spanCount = config.orientation == Configuration.ORIENTATION_LANDSCAPE 
-                    ? PHONE_LANDSCAPE_SPAN_COUNT : PHONE_PORTRAIT_SPAN_COUNT;
-                layoutManager = new GridLayoutManager(requireContext(), spanCount);
-            }
+            Configuration config = getResources().getConfiguration();
+            int spanCount = calculateSpanCount(config);
+            gridLayoutManager = new GridLayoutManager(requireContext(), spanCount);
             
-            binding.recyclerViewTrending.setLayoutManager(layoutManager);
+            binding.recyclerViewTrending.setLayoutManager(gridLayoutManager);
             binding.recyclerViewTrending.setAdapter(videoAdapter);
             
-            // Optimize for Android TV navigation
             if (isAndroidTV) {
                 binding.recyclerViewTrending.setFocusable(true);
                 binding.recyclerViewTrending.setFocusableInTouchMode(false);
@@ -189,8 +188,7 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
                 }
             });
             
-            // Set item animator for smoother transitions
-            binding.recyclerViewTrending.setItemAnimator(null); // Disable for performance on TV
+            binding.recyclerViewTrending.setItemAnimator(null);
             
         } catch (Exception e) {
             Log.e(TAG, "Error setting up RecyclerView", e);
@@ -203,21 +201,9 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         }
         
         try {
-            int visibleItemCount, totalItemCount, pastVisibleItems;
-            
-            if (layoutManager instanceof GridLayoutManager) {
-                GridLayoutManager gridLayoutManager = (GridLayoutManager) layoutManager;
-                visibleItemCount = gridLayoutManager.getChildCount();
-                totalItemCount = gridLayoutManager.getItemCount();
-                pastVisibleItems = gridLayoutManager.findFirstVisibleItemPosition();
-            } else if (layoutManager instanceof LinearLayoutManager) {
-                LinearLayoutManager linearLayoutManager = (LinearLayoutManager) layoutManager;
-                visibleItemCount = linearLayoutManager.getChildCount();
-                totalItemCount = linearLayoutManager.getItemCount();
-                pastVisibleItems = linearLayoutManager.findFirstVisibleItemPosition();
-            } else {
-                return false;
-            }
+            int visibleItemCount = gridLayoutManager.getChildCount();
+            int totalItemCount = gridLayoutManager.getItemCount();
+            int pastVisibleItems = gridLayoutManager.findFirstVisibleItemPosition();
 
             return (visibleItemCount + pastVisibleItems) >= totalItemCount - LOAD_MORE_THRESHOLD;
         } catch (Exception e) {
@@ -376,7 +362,7 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         }
         
         long duration = item.getDuration();
-        return duration > MINIMUM_VIDEO_DURATION || duration == -1; // -1 indicates live stream
+        return duration > MINIMUM_VIDEO_DURATION || duration == -1;
     }
 
     @Override
@@ -391,7 +377,6 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
             intent.putExtra("video_url", videoItem.getUrl());
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             
-            // Add Android TV specific flags
             if (isAndroidTV) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             }
@@ -458,7 +443,7 @@ public class TrendingFragment extends Fragment implements VideoAdapter.OnVideoIt
         }
         
         videoAdapter = null;
-        layoutManager = null;
+        gridLayoutManager = null;
     }
 
     private static class SearchResultHandler implements SearchManager.SearchResultListener {

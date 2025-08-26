@@ -16,12 +16,11 @@
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabs"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
             android:layout_marginTop="1dp"
             android:layout_marginBottom="6dp"
             android:background="@android:color/transparent"
-            android:minHeight="48dp"
             style="@style/Widget.Material3.TabLayout"
             app:tabGravity="start"
             app:tabIndicatorColor="@color/white"
@@ -31,6 +30,7 @@
             app:tabMode="scrollable"
             app:tabRippleColor="@color/white"
             app:tabSelectedTextColor="@color/white"
+            app:layout_scrollFlags="scroll|enterAlways"
             app:tabTextColor="@color/white"
             app:tabTextAppearance="@style/TextAppearance.Design.Tab" />
 
