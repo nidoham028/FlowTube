@@ -37,6 +37,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemClickListener {
 
+    // Intent Extras
+    public static final String EXTRA_VIDEO_URL = "video_url";
+    public static final String EXTRA_VIDEO_TITLE = "video_title";
+    public static final String EXTRA_CHANNEL_NAME = "channel_name";
+
     private static final String TAG = "TrendingFragment";
     private static final int MINIMUM_VIDEO_DURATION = 60;
     private static final int LOAD_MORE_THRESHOLD = 5;
@@ -372,7 +377,9 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
 
         try {
             Intent intent = new Intent(getContext(), PlayerActivity.class);
-            intent.putExtra("video_url", videoItem.getUrl());
+            intent.putExtra(EXTRA_VIDEO_URL, videoItem.getUrl());
+            intent.putExtra(EXTRA_VIDEO_TITLE, videoItem.getName());
+            intent.putExtra(EXTRA_CHANNEL_NAME, videoItem.getUploaderName());
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             
             if (isAndroidTV) {

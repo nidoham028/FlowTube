@@ -1,50 +1,35 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/SearchActivity.java",
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/helper/YouTubeDirectLink.java",
       "selection": {
         "end": {
           "column": 1,
-          "index": 25071,
-          "line": 662
+          "index": 2369,
+          "line": 59
         },
         "start": {
           "column": 1,
-          "index": 25071,
-          "line": 662
+          "index": 2369,
+          "line": 59
         }
       }
     },
     {
-      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout/activity_search.xml",
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java",
       "selection": {
         "end": {
-          "column": 43,
-          "index": 840,
-          "line": 19
+          "column": 28,
+          "index": 3183,
+          "line": 87
         },
         "start": {
-          "column": 43,
-          "index": 840,
-          "line": 19
-        }
-      }
-    },
-    {
-      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/adapter/SearchSuggestionsAdapter.java",
-      "selection": {
-        "end": {
-          "column": 1,
-          "index": 2252,
-          "line": 68
-        },
-        "start": {
-          "column": 1,
-          "index": 2252,
-          "line": 68
+          "column": 28,
+          "index": 3183,
+          "line": 87
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/adapter/SearchSuggestionsAdapter.java"
+  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java"
 }
