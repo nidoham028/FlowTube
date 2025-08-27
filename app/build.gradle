@@ -147,7 +147,9 @@ android {
 
 
 dependencies {
-
+    // ===============================================
+    // মিডিয়া এবং ভিডিও প্লেয়ার ডিপেন্ডেন্সি
+    // ===============================================
     def media3_version = "1.4.0"
     implementation "androidx.media3:media3-exoplayer:$media3_version"
     implementation "androidx.media3:media3-exoplayer-hls:$media3_version"
@@ -155,94 +157,117 @@ dependencies {
     implementation "androidx.media3:media3-session:$media3_version"
     implementation "androidx.media3:media3-datasource-okhttp:$media3_version"
     implementation "androidx.media3:media3-common:$media3_version"
+    implementation 'androidx.media:media:1.7.0'
 
-    // Leanback support library (for TV UI components)
-    implementation "androidx.leanback:leanback:1.1.0-rc02"
-    implementation 'de.hdodenhof:circleimageview:3.1.0'
-    implementation 'com.google.code.findbugs:jsr305:3.0.2'
-    // Gson library
-    implementation 'com.google.code.gson:gson:2.10.1'
-
-    // Desugaring
+    // ===============================================
+    // কোটলিন এবং কোর ল্যাঙ্গুয়েজ ডিপেন্ডেন্সি
+    // ===============================================
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs_nio:2.0.4'
 
-    // NewPipe libraries
-    implementation 'com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996'
-    implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.24.8'
-    implementation 'com.github.TeamNewPipe:NoNonsense-FilePicker:5.0.0'
-
-    // Kotlin
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
-
-    // AndroidX dependencies
+    // ===============================================
+    // AndroidX কোর এবং UI কম্পোনেন্ট
+    // ===============================================
     implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation 'androidx.cardview:cardview:1.0.0'
-    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
     implementation "androidx.core:core-ktx:$androidxCoreVersion"
-    implementation 'androidx.documentfile:documentfile:1.0.1'
+    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
     implementation "androidx.fragment:fragment-ktx:$androidxFragmentVersion"
-    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$androidxLifecycleVersion"
-    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$androidxLifecycleVersion"
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.documentfile:documentfile:1.0.1'
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
-    implementation 'androidx.media:media:1.7.0'
     implementation 'androidx.preference:preference:1.2.1'
     implementation "androidx.recyclerview:recyclerview:$androidxRecyclerViewVersion"
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.viewpager2:viewpager2:1.1.0-beta02'
-    implementation "androidx.work:work-runtime-ktx:$androidxWorkVersion"
-    implementation "androidx.work:work-rxjava3:$androidxWorkVersion"
     implementation "androidx.webkit:webkit:$androidxWebKitVersion"
     implementation "com.google.android.material:material:1.9.0"
 
-    // State management
+    // ===============================================
+    // লাইফসাইকেল এবং স্টেট ম্যানেজমেন্ট
+    // ===============================================
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$androidxLifecycleVersion"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$androidxLifecycleVersion"
+    implementation "androidx.work:work-runtime-ktx:$androidxWorkVersion"
+    implementation "androidx.work:work-rxjava3:$androidxWorkVersion"
     implementation 'com.github.livefront:bridge:v2.0.2'
     implementation 'com.evernote:android-state:1.4.1'
     kapt 'com.evernote:android-state-processor:1.4.1'
 
-    // Networking and parsing
+    // ===============================================
+    // নেটওয়ার্কিং এবং ডেটা পার্সিং
+    // ===============================================
     implementation "org.jsoup:jsoup:$jsoupVersion"
     implementation "com.squareup.okhttp3:okhttp:$okhttpVersion"
+    implementation 'com.google.code.gson:gson:2.10.1'
 
-    // Code generation
-    compileOnly 'com.google.auto.service:auto-service-annotations:1.1.1'
-    kapt 'com.google.auto.service:auto-service:1.1.1'
-
-    // UI components
-    implementation "com.github.lisawray.groupie:groupie:$groupieVersion"
-    implementation "com.github.lisawray.groupie:groupie-viewbinding:$groupieVersion"
-    implementation "com.squareup.picasso:picasso:$picassoVersion"
-
-    // Markdown rendering
-    implementation "io.noties.markwon:core:$markwonVersion"
-    implementation "io.noties.markwon:linkify:$markwonVersion"
-
-    // Error reporting and utilities
-    implementation "ch.acra:acra-core:$acraVersion"
-    implementation 'com.jakewharton:process-phoenix:2.1.2'
-
-    // Reactive programming
+    // ===============================================
+    // রিয়েক্টিভ প্রোগ্রামিং (RxJava)
+    // ===============================================
     implementation "io.reactivex.rxjava3:rxjava:$rxJavaVersion"
     implementation "io.reactivex.rxjava3:rxandroid:$rxAndroidVersion"
     implementation 'com.jakewharton.rxbinding4:rxbinding:4.0.0'
 
-    // Utilities
+    // ===============================================
+    // UI এবং ভিজুয়াল কম্পোনেন্ট
+    // ===============================================
+    implementation "com.github.lisawray.groupie:groupie:$groupieVersion"
+    implementation "com.github.lisawray.groupie:groupie-viewbinding:$groupieVersion"
+    implementation "com.squareup.picasso:picasso:$picassoVersion"
+    implementation 'de.hdodenhof:circleimageview:3.1.0'
+    implementation "androidx.leanback:leanback:1.1.0-rc02"
+
+    // ===============================================
+    // মার্কডাউন এবং টেক্সট রেন্ডারিং
+    // ===============================================
+    implementation "io.noties.markwon:core:$markwonVersion"
+    implementation "io.noties.markwon:linkify:$markwonVersion"
+
+    // ===============================================
+    // কোড জেনারেশন এবং এনোটেশন প্রসেসিং
+    // ===============================================
+    compileOnly 'com.google.auto.service:auto-service-annotations:1.1.1'
+    kapt 'com.google.auto.service:auto-service:1.1.1'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+
+    // ===============================================
+    // এরর রিপোর্টিং এবং ইউটিলিটি
+    // ===============================================
+    implementation "ch.acra:acra-core:$acraVersion"
+    implementation 'com.jakewharton:process-phoenix:2.1.2'
     implementation 'org.ocpsoft.prettytime:prettytime:5.0.8.Final'
 
-    // Debug dependencies
+    // ===============================================
+    // নিউপাইপ স্পেসিফিক লাইব্রেরি
+    // ===============================================
+    implementation 'com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996'
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.24.8'
+    implementation 'com.github.TeamNewPipe:NoNonsense-FilePicker:5.0.0'
+
+    // ===============================================
+    // ডেবাগ এবং ডেভেলপমেন্ট টুলস (শুধুমাত্র ডেবাগ বিল্ডের জন্য)
+    // ===============================================
     debugImplementation "com.squareup.leakcanary:leakcanary-object-watcher-android:$leakCanaryVersion"
     debugImplementation "com.squareup.leakcanary:plumber-android:$leakCanaryVersion"
     debugImplementation "com.squareup.leakcanary:leakcanary-android-core:$leakCanaryVersion"
     debugImplementation 'com.facebook.stetho:stetho:1.6.0'
     debugImplementation 'com.facebook.stetho:stetho-okhttp3:1.6.0'
 
-    // Testing dependencies
+    // ===============================================
+    // টেস্টিং ডিপেন্ডেন্সি (ইউনিট টেস্ট)
+    // ===============================================
     testImplementation "junit:junit:$junitVersion"
     testImplementation "org.mockito:mockito-core:$mockitoVersion"
+
+    // ===============================================
+    // টেস্টিং ডিপেন্ডেন্সি (ইন্সট্রুমেন্টাল টেস্ট)
+    // ===============================================
     androidTestImplementation "androidx.test.ext:junit:$androidxTestVersion"
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation "org.assertj:assertj-core:$assertjVersion"
     
-    // Custom libraries
+    // ===============================================
+    // কাস্টম জার ফাইল (লোকাল লাইব্রেরি)
+    // ===============================================
     implementation files('libs/com.nidoham.strivo.jar')
     implementation files('libs/com.nidoham.localization.jar')
 }

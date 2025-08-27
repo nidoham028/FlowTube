@@ -1,0 +1,20 @@
+{
+  "allFiles": [
+    {
+      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java",
+      "selection": {
+        "end": {
+          "column": 1,
+          "index": 30004,
+          "line": 769
+        },
+        "start": {
+          "column": 1,
+          "index": 30004,
+          "line": 769
+        }
+      }
+    }
+  ],
+  "selectedFile": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java"
+}

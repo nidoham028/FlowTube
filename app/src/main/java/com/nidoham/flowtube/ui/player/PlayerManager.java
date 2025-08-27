@@ -8,6 +8,10 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.TrackSelectionParameters;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.ProgressiveMediaSource;
+import androidx.media3.exoplayer.source.MergingMediaSource;
+import androidx.media3.datasource.DefaultDataSource;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +19,7 @@ public class PlayerManager {
     private static PlayerManager instance;
     private ExoPlayer player;
     private DefaultTrackSelector trackSelector;
+    private DefaultDataSource.Factory dataSourceFactory;
 
     private PlayerManager() {}
 
@@ -28,6 +33,7 @@ public class PlayerManager {
     public void initializePlayer(Context context) {
         if (player == null) {
             trackSelector = new DefaultTrackSelector(context);
+            dataSourceFactory = new DefaultDataSource.Factory(context);
             player = new ExoPlayer.Builder(context)
                     .setTrackSelector(trackSelector)
                     .build();
@@ -38,9 +44,47 @@ public class PlayerManager {
         return player;
     }
 
+    /**
+     * Loads media from a single URL containing both video and audio (progressive stream).
+     * Maintains backward compatibility with existing code.
+     */
     public void loadMedia(String url) {
+        loadMediaInternal(url);
+    }
+
+    /**
+     * Internal method for loading media from a single URL.
+     */
+    private void loadMediaInternal(String url) {
+        if (player == null || dataSourceFactory == null) return;
+        
         MediaItem mediaItem = MediaItem.fromUri(url);
-        player.setMediaItem(mediaItem);
+        MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(mediaItem);
+        
+        player.setMediaSource(mediaSource);
+        player.prepare();
+        player.play();
+    }
+
+    /**
+     * Loads and merges separate video and audio streams using MergingMediaSource.
+     * The streams will be synchronized and played together.
+     */
+    public void loadMediaWithSeparateStreams(String videoUrl, String audioUrl) {
+        if (player == null || dataSourceFactory == null) return;
+        
+        MediaItem videoMediaItem = MediaItem.fromUri(videoUrl);
+        MediaItem audioMediaItem = MediaItem.fromUri(audioUrl);
+        
+        MediaSource videoSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(videoMediaItem);
+        MediaSource audioSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(audioMediaItem);
+        
+        MergingMediaSource mergingMediaSource = new MergingMediaSource(videoSource, audioSource);
+        
+        player.setMediaSource(mergingMediaSource);
         player.prepare();
         player.play();
     }
@@ -58,6 +102,7 @@ public class PlayerManager {
             player.release();
             player = null;
             trackSelector = null;
+            dataSourceFactory = null;
         }
     }
 

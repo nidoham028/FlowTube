@@ -23,8 +23,19 @@ public class PlayerViewModel extends AndroidViewModel {
         return playerManager.getPlayer();
     }
 
+    /**
+     * Loads media from a single URL containing both video and audio.
+     */
     public void loadMedia(String url) {
         playerManager.loadMedia(url);
+    }
+
+    /**
+     * Loads and merges separate video and audio streams.
+     * The streams will be synchronized and played together.
+     */
+    public void loadMediaWithSeparateStreams(String videoUrl, String audioUrl) {
+        playerManager.loadMediaWithSeparateStreams(videoUrl, audioUrl);
     }
 
     public void play() {
