@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
@@ -24,7 +25,7 @@ import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import com.nidoham.flowtube.databinding.ActivityPlayerBinding;
-import com.nidoham.flowtube.helper.YouTubeDirectLink;
+import com.nidoham.flowtube.tools.YouTubeStreamResolver;
 import com.nidoham.flowtube.ui.viewmodel.PlayerViewModel;
 
 public class PlayerActivity extends AppCompatActivity {
@@ -53,6 +54,8 @@ public class PlayerActivity extends AppCompatActivity {
     private String directVideoUrl = null;
     private boolean isFirstCreate = true;
 
+    private YouTubeStreamResolver resolver;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -77,6 +80,7 @@ public class PlayerActivity extends AppCompatActivity {
         isLandscape = (orientation == Configuration.ORIENTATION_LANDSCAPE);
 
         playerViewModel = new ViewModelProvider(this).get(PlayerViewModel.class);
+        resolver = new YouTubeStreamResolver();
 
         // Restore instance state or intent
         if (savedInstanceState != null) {
@@ -114,10 +118,10 @@ public class PlayerActivity extends AppCompatActivity {
             if (videoUrl != null && !videoUrl.isEmpty() && isYouTubeUrl(videoUrl)) {
                 showLoading(true);
                 final long finalPlaybackPosition = playbackPosition;
-                YouTubeDirectLink.getDirectLink(this, videoUrl, new YouTubeDirectLink.DirectLinkCallback() {
+                resolver.getWiFiOptimizedDirectLink(videoUrl, new YouTubeStreamResolver.DirectLinkCallback() {
                     @Override
-                    public void onSuccess(String directUrl) {
-                        mainHandler.post(() -> {
+                    public void onSuccess(String directUrl, com.nidoham.flowtube.tools.model.StreamInfo streamInfo) {
+                        runOnUiThread(() -> {
                             try {
                                 if (!isDestroyed && playerViewModel != null) {
                                     directVideoUrl = directUrl;
@@ -132,11 +136,12 @@ public class PlayerActivity extends AppCompatActivity {
                             }
                         });
                     }
+
                     @Override
-                    public void onError(Exception e) {
-                        mainHandler.post(() -> {
+                    public void onError(String error, Exception exception) {
+                        Log.e("WiFi", "WiFi optimized extraction failed", exception);
+                        runOnUiThread(() -> {
                             showLoading(false);
-                            Toast.makeText(PlayerActivity.this, "Failed to load video: " + e.getMessage(), Toast.LENGTH_LONG).show();
                             finish();
                         });
                     }
@@ -211,8 +216,8 @@ public class PlayerActivity extends AppCompatActivity {
                     else showSystemUI();
                 } else {
                     // Phone: Use Android 15 recommended orientation APIs if available, else fallback
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // Android 15
-                        int newOrientation = (getDisplay().getRotation() % 2 == 0)
+                    if (Build.VERSION.SDK_INT >= 34 /* Build.VERSION_CODES.UPSIDE_DOWN_CAKE */) { // Android 15
+                        int newOrientation = (getDisplay() != null && getDisplay().getRotation() % 2 == 0)
                                 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                                 : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
                         setRequestedOrientation(newOrientation);
@@ -331,7 +336,7 @@ public class PlayerActivity extends AppCompatActivity {
                 if (controlsHideRunnable != null) {
                     mainHandler.removeCallbacks(controlsHideRunnable);
                 }
-                
+
                 if (isLandscape && !isAndroidTv) {
                     // Phone landscape: toggle all controls
                     if (areAllControlsVisible()) {
@@ -364,7 +369,7 @@ public class PlayerActivity extends AppCompatActivity {
         if (controlsHideRunnable != null) {
             mainHandler.removeCallbacks(controlsHideRunnable);
         }
-        
+
         // Create new timer runnable
         controlsHideRunnable = () -> {
             try {
@@ -377,7 +382,7 @@ public class PlayerActivity extends AppCompatActivity {
                 // Handle any potential exceptions during UI updates
             }
         };
-        
+
         // Start the timer
         mainHandler.postDelayed(controlsHideRunnable, CONTROLS_HIDE_DELAY_MS);
     }

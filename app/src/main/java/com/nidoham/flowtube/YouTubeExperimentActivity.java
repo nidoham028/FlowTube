@@ -1,16 +1,18 @@
 package com.nidoham.flowtube;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.nidoham.flowtube.tools.YouTubeStreamResolver;
-import com.nidoham.flowtube.tools.model.StreamInfo;
-import java.util.List;
 
 public class YouTubeExperimentActivity extends AppCompatActivity {
+    private static final String TAG = "YouTubeExperiment";
+
     private EditText inputUrl;
     private Button fetchButton;
     private TextView resultText;
@@ -31,26 +33,33 @@ public class YouTubeExperimentActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 String url = inputUrl.getText().toString().trim();
-                if (url.isEmpty()) {
-                    resultText.setText("Please enter a YouTube video URL.");
+                if (url == null || url.isEmpty() ||
+                        !(url.contains("youtube.com") || url.contains("youtu.be"))) {
+                    resultText.setText("Please enter a valid YouTube video URL.");
+                    Toast.makeText(YouTubeExperimentActivity.this, "Please enter a valid YouTube video URL.", Toast.LENGTH_LONG).show();
                     return;
                 }
-                resultText.setText("Loading...");
-                new Thread(() -> {
-                    try {
-                        List<StreamInfo> streams = resolver.getAvailableStreams(url);
-                        StringBuilder builder = new StringBuilder();
-                        for (StreamInfo s : streams) {
-                            builder.append("Quality: ").append(s.getQuality())
-                                    .append("\nFormat: ").append(s.getFormat())
-                                    .append("\nURL: ").append(s.getUrl())
-                                    .append("\n\n");
-                        }
-                        runOnUiThread(() -> resultText.setText(builder.length() > 0 ? builder.toString() : "No streams found."));
-                    } catch (Exception e) {
-                        runOnUiThread(() -> resultText.setText("Failed: " + e.getMessage()));
+
+                fetchButton.setEnabled(false);
+                resultText.setText("Retrieving WiFi optimized link...");
+                resolver.getWiFiOptimizedDirectLink(url, new YouTubeStreamResolver.DirectLinkCallback() {
+                    @Override
+                    public void onSuccess(String directUrl, com.nidoham.flowtube.tools.model.StreamInfo streamInfo) {
+                        runOnUiThread(() -> {
+                            resultText.setText("WiFi Optimized Direct Link:\n" + directUrl);
+                            fetchButton.setEnabled(true);
+                        });
                     }
-                }).start();
+
+                    @Override
+                    public void onError(String error, Exception exception) {
+                        Log.e(TAG, "WiFi optimized extraction failed", exception);
+                        runOnUiThread(() -> {
+                            resultText.setText("WiFi optimized extraction failed: " + error);
+                            fetchButton.setEnabled(true);
+                        });
+                    }
+                });
             }
         });
     }
