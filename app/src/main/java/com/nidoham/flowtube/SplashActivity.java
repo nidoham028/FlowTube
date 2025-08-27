@@ -27,7 +27,7 @@ public class SplashActivity extends AppCompatActivity {
         if(true) {
         	navigateToNextScreen();
         } else {
-        	Intent intent = new Intent(SplashActivity.this, PlayerActivity.class);
+        	Intent intent = new Intent(SplashActivity.this, YouTubeExperimentActivity.class);
             startActivity(intent);
         }
     }

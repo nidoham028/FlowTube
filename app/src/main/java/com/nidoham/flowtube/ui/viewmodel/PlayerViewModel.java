@@ -5,6 +5,7 @@ import android.content.Context;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.media3.exoplayer.ExoPlayer;
 import com.nidoham.flowtube.ui.player.PlayerManager;
+import java.util.List;
 
 public class PlayerViewModel extends AndroidViewModel {
     private PlayerManager playerManager;
@@ -40,5 +41,18 @@ public class PlayerViewModel extends AndroidViewModel {
 
     public void release() {
         playerManager.release();
+    }
+
+    // --- Quality APIs ---
+    public void setAutoQuality() {
+        playerManager.setAutoQuality();
+    }
+
+    public List<Integer> getAvailableVideoHeights() {
+        return playerManager.getAvailableVideoHeights();
+    }
+
+    public void selectQuality(int height) {
+        playerManager.selectQuality(height);
     }
 }

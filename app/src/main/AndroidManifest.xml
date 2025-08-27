@@ -140,6 +140,12 @@
             android:finishOnTaskLaunch="false"
             android:clearTaskOnLaunch="false" />
 
+
+        <!-- Expriments -->
+        <activity
+            android:name=".YouTubeExperimentActivity"
+            android:exported="false"/>
+
         <!-- File Provider -->
         <provider
             android:name="androidx.core.content.FileProvider"
