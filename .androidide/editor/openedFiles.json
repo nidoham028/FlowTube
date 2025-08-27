@@ -4,29 +4,14 @@
       "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java",
       "selection": {
         "end": {
-          "column": 27,
-          "index": 16164,
-          "line": 383
+          "column": 85,
+          "index": 9122,
+          "line": 213
         },
         "start": {
-          "column": 27,
-          "index": 16164,
-          "line": 383
-        }
-      }
-    },
-    {
-      "file": "/storage/emulated/0/CodeAssist/FlowTube/app/src/main/res/layout-land/activity_player.xml",
-      "selection": {
-        "end": {
-          "column": 52,
-          "index": 16454,
-          "line": 350
-        },
-        "start": {
-          "column": 52,
-          "index": 16454,
-          "line": 350
+          "column": 85,
+          "index": 9122,
+          "line": 213
         }
       }
     }

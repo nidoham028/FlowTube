@@ -113,8 +113,9 @@
             android:name=".PlayerActivity"
             android:exported="false"
             android:resizeableActivity="true"
-            android:screenOrientation="unspecified" />
-
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize" />
+        
         <activity
             android:name=".SearchActivity"
             android:exported="false"
@@ -131,7 +132,7 @@
         <!-- Debug Activity -->
         <activity
             android:name=".DebugActivity"
-            android:exported="false"
+            android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:excludeFromRecents="true"

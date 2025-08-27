@@ -59,6 +59,11 @@ public class SearchActivity extends AppCompatActivity implements UnifiedSearchAd
 
     private static final String TAG = "SearchActivity";
     private static final String CLASS_NAME = SearchActivity.class.getSimpleName();
+    
+    // Intent Extras
+    public static final String EXTRA_VIDEO_URL = "video_url";
+    public static final String EXTRA_VIDEO_TITLE = "video_title";
+    public static final String EXTRA_CHANNEL_NAME = "channel_name";
 
     // Configuration Constants
     private static final long SUGGESTION_DELAY_MS = 300L;
@@ -423,9 +428,10 @@ public class SearchActivity extends AppCompatActivity implements UnifiedSearchAd
         try {
             // Assuming PlayerActivity exists
             Intent intent = new Intent(this, PlayerActivity.class);
-            intent.putExtra("video_url", videoItem.getUrl());
-            intent.putExtra("video_title", videoItem.getName());
-            intent.putExtra("video_uploader", videoItem.getUploaderName());
+            intent.putExtra(EXTRA_VIDEO_URL, videoItem.getUrl());
+            intent.putExtra(EXTRA_VIDEO_TITLE, videoItem.getName());
+            intent.putExtra(EXTRA_CHANNEL_NAME, videoItem.getUploaderName());
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Error opening video: " + videoItem.getUrl(), e);

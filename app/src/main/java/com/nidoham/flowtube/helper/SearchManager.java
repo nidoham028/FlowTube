@@ -30,26 +30,27 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
+/**
+ * SearchManager: Handles YouTube search with full error safety and resource protection.
+ */
 public class SearchManager {
-    
+
     private static final String TAG = "SearchManager";
     private static final int YOUTUBE_SERVICE_ID = ServiceList.YouTube.getServiceId();
     private static final int MAX_QUERY_LENGTH = 1000;
     private static final int MIN_QUERY_LENGTH = 1;
     private static final long CACHE_EXPIRY_TIME = TimeUnit.HOURS.toMillis(2);
-    
+
     private static volatile SearchManager instance;
     private final CompositeDisposable disposables = new CompositeDisposable();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
-    
+
     private volatile SearchResultListener currentListener;
     private volatile String currentQuery;
     private volatile Page nextPage;
     private volatile boolean isSearching = false;
 
-    private SearchManager() {
-        // Private constructor for singleton pattern
-    }
+    private SearchManager() {}
 
     public static SearchManager getInstance() {
         if (instance == null) {
@@ -62,6 +63,7 @@ public class SearchManager {
         return instance;
     }
 
+    // --- Listener Definitions ---
     public interface SearchResultListener {
         void onSearchStarted(String query);
         void onSearchResults(SearchResults results);
@@ -79,8 +81,8 @@ public class SearchManager {
         public final int totalResults;
         private final long timestamp;
 
-        public SearchResults(String query, List<InfoItem> items, String searchSuggestion, 
-                           boolean isCorrectedSearch, boolean hasMorePages, int totalResults) {
+        public SearchResults(String query, List<InfoItem> items, String searchSuggestion,
+                             boolean isCorrectedSearch, boolean hasMorePages, int totalResults) {
             this.query = query;
             this.items = items != null ? Collections.unmodifiableList(new ArrayList<>(items)) : Collections.emptyList();
             this.searchSuggestion = searchSuggestion;
@@ -125,7 +127,7 @@ public class SearchManager {
         }
     }
 
-    public static class SearchError {
+    public static class SearchError extends Exception {
         public final String query;
         public final Throwable exception;
         public final ErrorType type;
@@ -142,6 +144,7 @@ public class SearchManager {
         }
 
         public SearchError(String query, Throwable exception, ErrorType type, String message) {
+            super(message, exception);
             this.query = query;
             this.exception = exception;
             this.type = type;
@@ -149,27 +152,27 @@ public class SearchManager {
         }
     }
 
+    // --- Main Search API ---
     public void searchYouTube(@NonNull String query, @NonNull SearchResultListener listener) {
         if (!isValidQuery(query)) {
-            listener.onSearchError(new SearchError(query, 
-                new IllegalArgumentException("Invalid search query"), 
-                SearchError.ErrorType.INVALID_QUERY, 
-                "Search query must be between " + MIN_QUERY_LENGTH + " and " + MAX_QUERY_LENGTH + " characters"));
+            safeListenerCall(() -> listener.onSearchError(new SearchError(query,
+                new IllegalArgumentException("Invalid search query"),
+                SearchError.ErrorType.INVALID_QUERY,
+                "Search query must be between " + MIN_QUERY_LENGTH + " and " + MAX_QUERY_LENGTH + " characters")));
             return;
         }
 
         synchronized (this) {
             cancelCurrentSearch();
-            
             currentQuery = query.trim();
             currentListener = listener;
             isSearching = true;
             nextPage = null;
         }
 
-        if (currentListener != null) {
-            currentListener.onSearchStarted(currentQuery);
-        }
+        safeListenerCall(() -> {
+            if (currentListener != null) currentListener.onSearchStarted(currentQuery);
+        });
 
         performNetworkSearch();
     }
@@ -192,7 +195,6 @@ public class SearchManager {
                 this::handleSearchSuccess,
                 this::handleSearchError
             );
-
             disposables.add(searchDisposable);
         } catch (Exception e) {
             handleSearchError(e);
@@ -215,12 +217,12 @@ public class SearchManager {
                 searchInfo.getRelatedItems().size()
             );
 
-            if (currentListener != null) {
-                currentListener.onSearchResults(results);
-            }
+            safeListenerCall(() -> {
+                if (currentListener != null) currentListener.onSearchResults(results);
+            });
 
-            Log.d(TAG, "Search completed for: " + currentQuery + 
-                  ", found " + results.totalResults + " items");
+            Log.d(TAG, "Search completed for: " + currentQuery +
+                    ", found " + results.totalResults + " items");
 
         } catch (Exception e) {
             Log.e(TAG, "Error handling search success", e);
@@ -232,17 +234,15 @@ public class SearchManager {
         synchronized (this) {
             isSearching = false;
         }
-        
-        if (currentListener == null) {
-            return;
-        }
+
+        if (currentListener == null) return;
 
         SearchError.ErrorType errorType = determineErrorType(throwable);
         String errorMessage = generateErrorMessage(throwable, errorType);
 
         SearchError searchError = new SearchError(currentQuery, throwable, errorType, errorMessage);
-        currentListener.onSearchError(searchError);
 
+        safeListenerCall(() -> currentListener.onSearchError(searchError));
         Log.e(TAG, "Search failed for query: " + currentQuery, throwable);
     }
 
@@ -255,7 +255,7 @@ public class SearchManager {
                 return SearchError.ErrorType.RECAPTCHA_REQUIRED;
             }
             return SearchError.ErrorType.EXTRACTION_ERROR;
-        } else if (throwable instanceof java.net.UnknownHostException 
+        } else if (throwable instanceof java.net.UnknownHostException
                 || throwable instanceof java.net.SocketTimeoutException
                 || throwable instanceof java.io.IOException) {
             return SearchError.ErrorType.NETWORK_ERROR;
@@ -284,6 +284,7 @@ public class SearchManager {
         }
     }
 
+    // --- Paging Support ---
     public void loadMoreResults() {
         synchronized (this) {
             if (!Page.isValid(nextPage) || isSearching || currentListener == null) {
@@ -321,19 +322,22 @@ public class SearchManager {
             nextPage = result.getNextPage();
         }
 
-        if (currentListener != null) {
-            List<InfoItem> items = new ArrayList<>(result.getItems());
-            currentListener.onMoreResultsLoaded(items, Page.isValid(nextPage));
-        }
+        safeListenerCall(() -> {
+            if (currentListener != null) {
+                List<InfoItem> items = new ArrayList<>(result.getItems());
+                currentListener.onMoreResultsLoaded(items, Page.isValid(nextPage));
+            }
+        });
 
         Log.d(TAG, "Loaded " + result.getItems().size() + " more results for: " + currentQuery);
     }
 
+    // --- Suggestions ---
     public void getSearchSuggestions(@NonNull String query) {
         if (!isValidQuery(query)) {
-            if (currentListener != null) {
-                currentListener.onSearchSuggestions(Collections.emptyList());
-            }
+            safeListenerCall(() -> {
+                if (currentListener != null) currentListener.onSearchSuggestions(Collections.emptyList());
+            });
             return;
         }
 
@@ -352,31 +356,34 @@ public class SearchManager {
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(
-                suggestions -> {
-                    if (currentListener != null) {
-                        currentListener.onSearchSuggestions(suggestions);
-                    }
-                },
+                suggestions -> safeListenerCall(() -> {
+                    if (currentListener != null) currentListener.onSearchSuggestions(suggestions);
+                }),
                 throwable -> {
                     Log.w(TAG, "Failed to get suggestions for: " + trimmedQuery, throwable);
-                    if (currentListener != null) {
-                        currentListener.onSearchSuggestions(Collections.emptyList());
-                    }
+                    safeListenerCall(() -> {
+                        if (currentListener != null) currentListener.onSearchSuggestions(Collections.emptyList());
+                    });
                 }
             );
 
             disposables.add(suggestionDisposable);
         } catch (Exception e) {
             Log.w(TAG, "Error initiating suggestion search", e);
-            if (currentListener != null) {
-                currentListener.onSearchSuggestions(Collections.emptyList());
-            }
+            safeListenerCall(() -> {
+                if (currentListener != null) currentListener.onSearchSuggestions(Collections.emptyList());
+            });
         }
     }
 
+    // --- Cleanup & Resource Management ---
     public void cancelCurrentSearch() {
         synchronized (this) {
-            disposables.clear();
+            try {
+                disposables.clear();
+            } catch (Exception e) {
+                Log.w(TAG, "Error clearing disposables", e);
+            }
             isSearching = false;
             currentQuery = null;
             nextPage = null;
@@ -412,9 +419,10 @@ public class SearchManager {
         }
     }
 
+    // --- Synchronous and Simple Search ---
     public CompletableFuture<SearchResults> searchSync(@NonNull String query) {
         CompletableFuture<SearchResults> future = new CompletableFuture<>();
-        
+
         SearchResultListener syncListener = new SearchResultListener() {
             @Override
             public void onSearchStarted(String query) {
@@ -433,7 +441,7 @@ public class SearchManager {
 
             @Override
             public void onSearchError(SearchError error) {
-                future.completeExceptionally(error.exception);
+                future.completeExceptionally(error);
             }
 
             @Override
@@ -444,9 +452,9 @@ public class SearchManager {
 
         SearchResultListener previousListener = currentListener;
         setSearchResultListener(syncListener);
-        
+
         searchYouTube(query, syncListener);
-        
+
         future.whenComplete((result, throwable) -> {
             setSearchResultListener(previousListener);
         });
@@ -464,28 +472,24 @@ public class SearchManager {
         setSearchResultListener(new SearchResultListener() {
             @Override
             public void onSearchStarted(String query) {
-                callback.onSearchStarted();
+                safeListenerCall(callback::onSearchStarted);
             }
 
             @Override
             public void onSearchResults(SearchResults results) {
-                callback.onResults(results.items);
+                safeListenerCall(() -> callback.onResults(results.items));
             }
 
             @Override
-            public void onSearchSuggestions(List<String> suggestions) {
-                // Not used in simple callback
-            }
+            public void onSearchSuggestions(List<String> suggestions) {}
 
             @Override
             public void onSearchError(SearchError error) {
-                callback.onError(error.message);
+                safeListenerCall(() -> callback.onError(error.message));
             }
 
             @Override
-            public void onMoreResultsLoaded(List<InfoItem> items, boolean hasMorePages) {
-                // Not used in simple callback
-            }
+            public void onMoreResultsLoaded(List<InfoItem> items, boolean hasMorePages) {}
         });
 
         searchYouTube(query, currentListener);
@@ -493,22 +497,24 @@ public class SearchManager {
 
     private boolean isValidQuery(@NonNull String query) {
         String trimmed = query.trim();
-        return !trimmed.isEmpty() && 
-               trimmed.length() >= MIN_QUERY_LENGTH && 
-               trimmed.length() <= MAX_QUERY_LENGTH;
+        return !trimmed.isEmpty() &&
+                trimmed.length() >= MIN_QUERY_LENGTH &&
+                trimmed.length() <= MAX_QUERY_LENGTH;
     }
 
     public void cleanup() {
         cancelCurrentSearch();
-        
-        executorService.shutdown();
+
         try {
+            executorService.shutdown();
             if (!executorService.awaitTermination(2, TimeUnit.SECONDS)) {
                 executorService.shutdownNow();
             }
         } catch (InterruptedException e) {
             executorService.shutdownNow();
             Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            Log.w(TAG, "Error shutting down executor service", e);
         }
 
         Log.d(TAG, "SearchManager cleanup completed");
@@ -516,7 +522,7 @@ public class SearchManager {
 
     public static CompletableFuture<List<InfoItem>> quickSearch(@NonNull String query) {
         CompletableFuture<List<InfoItem>> future = new CompletableFuture<>();
-        
+
         getInstance().search(query, new SimpleSearchCallback() {
             @Override
             public void onSearchStarted() {
@@ -535,5 +541,14 @@ public class SearchManager {
         });
 
         return future;
+    }
+
+    // --- Utility: Safe listener call ---
+    private void safeListenerCall(Runnable runnable) {
+        try {
+            runnable.run();
+        } catch (Throwable t) {
+            Log.e(TAG, "Listener callback threw exception", t);
+        }
     }
 }

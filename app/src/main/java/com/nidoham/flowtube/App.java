@@ -49,12 +49,34 @@ public class App extends Application {
         super.onCreate();
         instance = this;
         ACRA.init(this);
-        
+
         // Store the default exception handler before setting our custom one
         defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(this::handleUncaughtException);
 
+        // If a crash log exists, show DebugActivity FIRST
+        showDebugActivityIfCrashLogExists();
+
         performInitialization();
+    }
+
+    /**
+     * Show debug activity if a crash log persists from previous launch
+     */
+    private void showDebugActivityIfCrashLogExists() {
+        SharedPreferences prefs = getDefaultSharedPreferences();
+        String crashLog = prefs.getString(CRASH_LOG_KEY, null);
+        if (crashLog != null) {
+            Intent intent = new Intent(this, DebugActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .putExtra("error_message", prefs.getString(CRASH_LOG_KEY + "_description", "Previous Crash"))
+                    .putExtra("stack_trace", crashLog)
+                    .putExtra("crash_time", prefs.getLong(CRASH_LOG_KEY + "_time", System.currentTimeMillis()))
+                    .putExtra("thread_name", Thread.currentThread().getName());
+            startActivity(intent);
+            // Optional: clear log after showing
+            clearSavedCrashLog(this);
+        }
     }
 
     private void performInitialization() {
@@ -62,10 +84,10 @@ public class App extends Application {
             initializeBasicComponents();
             initializeNewPipeServices();
             setupApplicationLocalization();
-            
+
             isInitialized.set(true);
             Log.i(TAG, "FlowTube application initialized successfully");
-            
+
         } catch (Exception e) {
             Log.e(TAG, "Critical initialization failure", e);
             handleInitializationFailure(e);
@@ -77,7 +99,7 @@ public class App extends Application {
             ApplicationSettings.getInstance(this);
             AppLanguage.getInstance(this).initialize();
             PicassoHelper.init(this);
-            
+
             if (DEBUG) {
                 Log.d(TAG, "Basic application components initialized");
             }
@@ -93,17 +115,17 @@ public class App extends Application {
             if (downloaderImpl == null) {
                 throw new ExtractionException("DownloaderImpl initialization returned null");
             }
-            
+
             applyStoredCookies(downloaderImpl);
             NewPipe.init(downloaderImpl);
-            
+
             // Clear cache to ensure fresh start
             InfoCache.getInstance().clearCache();
-            
+
             if (DEBUG) {
                 Log.d(TAG, "NewPipe services initialized successfully");
             }
-            
+
         } catch (Exception e) {
             Log.e(TAG, "NewPipe initialization failed", e);
             throw new ExtractionException("Failed to initialize NewPipe services", e);
@@ -112,12 +134,12 @@ public class App extends Application {
 
     private void applyStoredCookies(@NonNull DownloaderImpl downloader) {
         final SharedPreferences preferences = getDefaultSharedPreferences();
-        
+
         // Apply reCAPTCHA cookies if available
         try {
             final String cookieKey = getResources().getString(R.string.recaptcha_cookies_key);
             final String storedCookies = preferences.getString(cookieKey, null);
-            
+
             if (storedCookies != null && !storedCookies.trim().isEmpty()) {
                 downloader.setCookie(ReCaptchaActivity.RECAPTCHA_COOKIES_KEY, storedCookies);
                 if (DEBUG) {
@@ -153,24 +175,27 @@ public class App extends Application {
     private void handleInitializationFailure(@NonNull Exception e) {
         final String errorMessage = "Critical application initialization failure";
         Log.e(TAG, errorMessage, e);
-        
+
         // Save initialization error details
         saveErrorDetails(errorMessage, e);
-        
+
         // Attempt to launch debug activity
         try {
             launchDebugActivity(errorMessage, e);
         } catch (Exception debugException) {
             Log.e(TAG, "Failed to launch debug activity after initialization failure", debugException);
         }
-        
+
         // Terminate application gracefully
         terminateApplication();
     }
 
+    /**
+     * Enhanced uncaught exception handler.
+     */
     private void handleUncaughtException(@NonNull Thread thread, @NonNull Throwable throwable) {
         Log.e(TAG, "Uncaught exception in thread: " + thread.getName(), throwable);
-        
+
         // Check crash frequency to prevent crash loops
         if (shouldPreventCrashLoop()) {
             Log.w(TAG, "Too many crashes detected, delegating to system handler");
@@ -179,19 +204,43 @@ public class App extends Application {
             }
             return;
         }
-        
+
         recordCrashOccurrence();
-        
+
         final String crashDetails = generateCrashReport(throwable, thread);
         saveErrorDetails("Application crash", throwable);
-        
+
+        // Try to launch DebugActivity via main thread handler
         try {
-            launchDebugActivity(crashDetails, throwable);
+            Intent intent = new Intent(this, DebugActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .putExtra("error_message", throwable.getMessage())
+                    .putExtra("stack_trace", crashDetails)
+                    .putExtra("crash_time", System.currentTimeMillis())
+                    .putExtra("thread_name", thread.getName());
+
+            Handler handler = new Handler(Looper.getMainLooper());
+            handler.post(() -> {
+                try {
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to launch DebugActivity", e);
+                }
+            });
+
+            // Wait *less* time, or let process die after the activity starts
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to launch debug activity after crash", e);
+            Log.e(TAG, "Failed to launch DebugActivity after crash", e);
         }
-        
-        terminateApplication();
+
+        // Always kill the process (Android requirement)
+        android.os.Process.killProcess(android.os.Process.myPid());
+        System.exit(10);
     }
 
     private boolean shouldPreventCrashLoop() {
@@ -199,7 +248,7 @@ public class App extends Application {
         final long currentTime = System.currentTimeMillis();
         final long lastCrashTime = preferences.getLong(LAST_CRASH_TIME_KEY, 0);
         final int crashCount = preferences.getInt(CRASH_COUNT_KEY, 0);
-        
+
         // Reset crash count if enough time has passed
         if (currentTime - lastCrashTime > CRASH_RESET_INTERVAL) {
             preferences.edit()
@@ -208,31 +257,34 @@ public class App extends Application {
                     .apply();
             return false;
         }
-        
+
         return crashCount >= MAX_CRASHES_PER_DAY;
     }
 
     private void recordCrashOccurrence() {
         final SharedPreferences preferences = getDefaultSharedPreferences();
         final int currentCrashCount = preferences.getInt(CRASH_COUNT_KEY, 0);
-        
+
         preferences.edit()
                 .putInt(CRASH_COUNT_KEY, currentCrashCount + 1)
                 .putLong(LAST_CRASH_TIME_KEY, System.currentTimeMillis())
                 .apply();
     }
 
+    /**
+     * Save crash details for later display.
+     */
     private void saveErrorDetails(@NonNull String description, @NonNull Throwable throwable) {
         try {
             final String crashReport = generateCrashReport(throwable, Thread.currentThread());
             final long timestamp = System.currentTimeMillis();
-            
+
             getDefaultSharedPreferences().edit()
                     .putString(CRASH_LOG_KEY, crashReport)
                     .putLong(CRASH_LOG_KEY + "_time", timestamp)
                     .putString(CRASH_LOG_KEY + "_description", description)
                     .apply();
-                    
+
         } catch (Exception e) {
             Log.w(TAG, "Failed to save error details", e);
         }
@@ -241,27 +293,25 @@ public class App extends Application {
     private String generateCrashReport(@NonNull Throwable throwable, @NonNull Thread thread) {
         final StringBuilder reportBuilder = new StringBuilder();
         final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-        
+
         reportBuilder.append("=== FlowTube Crash Report ===\n");
         reportBuilder.append("Time: ").append(dateFormat.format(new Date())).append("\n");
         reportBuilder.append("Thread: ").append(thread.getName()).append("\n");
         reportBuilder.append("Exception: ").append(throwable.getClass().getSimpleName()).append("\n");
         reportBuilder.append("Message: ").append(throwable.getMessage()).append("\n");
         reportBuilder.append("Stack Trace:\n");
-        
+
         final StringWriter stringWriter = new StringWriter();
         final PrintWriter printWriter = new PrintWriter(stringWriter);
         throwable.printStackTrace(printWriter);
         reportBuilder.append(stringWriter.toString());
-        
+
         return reportBuilder.toString();
     }
 
     private void launchDebugActivity(@NonNull String errorMessage, @NonNull Throwable throwable) {
         final Intent debugIntent = new Intent(this, DebugActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | 
-                         Intent.FLAG_ACTIVITY_CLEAR_TOP | 
-                         Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 .putExtra("error_message", errorMessage)
                 .putExtra("stack_trace", Log.getStackTraceString(throwable))
                 .putExtra("crash_time", System.currentTimeMillis())
@@ -285,12 +335,13 @@ public class App extends Application {
     private void terminateApplication() {
         try {
             // Allow brief time for debug activity launch
-            Thread.sleep(1000);
+            Thread.sleep(500);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        
+
         android.os.Process.killProcess(android.os.Process.myPid());
+        System.exit(10);
     }
 
     public void refreshYouTubeConfiguration() {
@@ -346,13 +397,13 @@ public class App extends Application {
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        
+
         if (!isInitialized.get()) {
             return;
         }
-        
+
         final InfoCache cache = InfoCache.getInstance();
-        
+
         switch (level) {
             case TRIM_MEMORY_RUNNING_MODERATE:
                 cache.trimCache();
@@ -360,7 +411,7 @@ public class App extends Application {
                     Log.d(TAG, "Memory trimmed: moderate pressure");
                 }
                 break;
-                
+
             case TRIM_MEMORY_RUNNING_LOW:
             case TRIM_MEMORY_RUNNING_CRITICAL:
                 cache.clearCache();
@@ -374,25 +425,29 @@ public class App extends Application {
                     Log.d(TAG, "Memory cleared: high pressure (level " + level + ")");
                 }
                 break;
-                
+
             case TRIM_MEMORY_UI_HIDDEN:
                 cache.trimCache();
                 if (DEBUG) {
                     Log.d(TAG, "UI hidden, trimming cache");
                 }
                 break;
-                
+
             default:
                 if (DEBUG) {
                     Log.d(TAG, "Memory trim level: " + level);
                 }
         }
     }
+    
+    public static Context getAppContext(){
+        return getInstance().getApplicationContext();
+    }
 
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        
+
         if (isInitialized.get()) {
             InfoCache.getInstance().clearCache();
             if (DEBUG) {

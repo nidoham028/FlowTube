@@ -35,6 +35,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * HomeFragment: Shows trending videos with full error protection.
+ */
 public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemClickListener {
 
     // Intent Extras
@@ -42,7 +45,7 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     public static final String EXTRA_VIDEO_TITLE = "video_title";
     public static final String EXTRA_CHANNEL_NAME = "channel_name";
 
-    private static final String TAG = "TrendingFragment";
+    private static final String TAG = "HomeFragment";
     private static final int MINIMUM_VIDEO_DURATION = 60;
     private static final int LOAD_MORE_THRESHOLD = 5;
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -50,132 +53,153 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     private static final int TV_GRID_SPAN_COUNT = 3;
     private static final int PHONE_PORTRAIT_SPAN_COUNT = 1;
     private static final int PHONE_LANDSCAPE_SPAN_COUNT = 2;
-    
+
     private FragmentHomeBinding binding;
     private final List<StreamInfoItem> videoList = Collections.synchronizedList(new ArrayList<>());
     private VideoAdapter videoAdapter;
     private SearchManager searchManager;
     private Handler mainHandler;
-    
+
     private final AtomicBoolean isLoading = new AtomicBoolean(false);
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
     private boolean hasMorePages = true;
     private boolean isInitialLoad = true;
     private int retryAttempts = 0;
     private String lastQuery = "";
-    
+
     private boolean isAndroidTV = false;
     private GridLayoutManager gridLayoutManager;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mainHandler = new Handler(Looper.getMainLooper());
-        detectAndroidTV();
-        
-        getLifecycle().addObserver(new DefaultLifecycleObserver() {
-            @Override
-            public void onDestroy(@NonNull LifecycleOwner owner) {
-                cleanup();
-            }
-        });
+        try {
+            mainHandler = new Handler(Looper.getMainLooper());
+            detectAndroidTV();
+
+            getLifecycle().addObserver(new DefaultLifecycleObserver() {
+                @Override
+                public void onDestroy(@NonNull LifecycleOwner owner) {
+                    cleanup();
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onCreate", e);
+            safeToast("Initialization error");
+        }
     }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        binding = FragmentHomeBinding.inflate(inflater, container, false);
-        return binding.getRoot();
+        try {
+            binding = FragmentHomeBinding.inflate(inflater, container, false);
+            return binding.getRoot();
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onCreateView", e);
+            safeToast("Cannot show trending videos.");
+            return new View(requireContext());
+        }
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
-        if (isDestroyed.get()) {
-            return;
-        }
-        
-        initializeComponents();
-        setupRecyclerView();
-        
-        if (videoList.isEmpty()) {
-            loadTrendingContent();
+
+        if (isDestroyed.get()) return;
+
+        try {
+            initializeComponents();
+            setupRecyclerView();
+
+            if (videoList.isEmpty()) {
+                loadTrendingContent();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onViewCreated", e);
+            safeToast("Failed to load trending videos.");
         }
     }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        
-        if (binding != null && !isDestroyed.get() && gridLayoutManager != null) {
-            updateLayoutManagerSpanCount(newConfig);
+        try {
+            if (binding != null && !isDestroyed.get() && gridLayoutManager != null) {
+                updateLayoutManagerSpanCount(newConfig);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error on configuration change", e);
         }
     }
 
     private void detectAndroidTV() {
-        Context context = getContext();
-        if (context != null) {
-            isAndroidTV = context.getPackageManager().hasSystemFeature("android.software.leanback");
+        try {
+            Context context = getContext();
+            if (context != null) {
+                isAndroidTV = context.getPackageManager().hasSystemFeature("android.software.leanback");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to detect Android TV", e);
         }
     }
 
     private void updateLayoutManagerSpanCount(Configuration config) {
-        int currentSpanCount = gridLayoutManager.getSpanCount();
-        int newSpanCount = calculateSpanCount(config);
-        
-        if (currentSpanCount != newSpanCount) {
-            gridLayoutManager.setSpanCount(newSpanCount);
+        try {
+            int currentSpanCount = gridLayoutManager.getSpanCount();
+            int newSpanCount = calculateSpanCount(config);
+
+            if (currentSpanCount != newSpanCount) {
+                gridLayoutManager.setSpanCount(newSpanCount);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to update layout span count", e);
         }
     }
 
     private int calculateSpanCount(Configuration config) {
-        if (isAndroidTV) {
-            return TV_GRID_SPAN_COUNT;
-        }
-        
-        return config.orientation == Configuration.ORIENTATION_LANDSCAPE 
-            ? PHONE_LANDSCAPE_SPAN_COUNT 
-            : PHONE_PORTRAIT_SPAN_COUNT;
+        if (isAndroidTV) return TV_GRID_SPAN_COUNT;
+        return config.orientation == Configuration.ORIENTATION_LANDSCAPE
+                ? PHONE_LANDSCAPE_SPAN_COUNT
+                : PHONE_PORTRAIT_SPAN_COUNT;
     }
 
     private void initializeComponents() {
         try {
             searchManager = SearchManager.getInstance();
-            
+
             if (binding != null) {
                 binding.swipeRefreshLayout.setOnRefreshListener(this::refreshContent);
                 binding.swipeRefreshLayout.setColorSchemeResources(
-                    android.R.color.holo_blue_bright,
-                    android.R.color.holo_green_light,
-                    android.R.color.holo_orange_light
+                        android.R.color.holo_blue_bright,
+                        android.R.color.holo_green_light,
+                        android.R.color.holo_orange_light
                 );
-                
+
                 if (isAndroidTV) {
                     binding.swipeRefreshLayout.setEnabled(false);
                 }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error initializing components", e);
+            safeToast("Failed to initialize UI.");
         }
     }
 
     private void setupRecyclerView() {
-        if (binding == null || isDestroyed.get()) {
-            return;
-        }
+        if (binding == null || isDestroyed.get()) return;
 
         try {
             videoAdapter = new VideoAdapter(videoList, this);
-            
+
             Configuration config = getResources().getConfiguration();
             int spanCount = calculateSpanCount(config);
             gridLayoutManager = new GridLayoutManager(requireContext(), spanCount);
-            
+
             binding.recyclerViewTrending.setLayoutManager(gridLayoutManager);
             binding.recyclerViewTrending.setAdapter(videoAdapter);
-            
+
             if (isAndroidTV) {
                 binding.recyclerViewTrending.setFocusable(true);
                 binding.recyclerViewTrending.setFocusableInTouchMode(false);
@@ -190,11 +214,12 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
                     }
                 }
             });
-            
+
             binding.recyclerViewTrending.setItemAnimator(null);
-            
+
         } catch (Exception e) {
             Log.e(TAG, "Error setting up RecyclerView", e);
+            safeToast("Failed to setup video list.");
         }
     }
 
@@ -202,7 +227,7 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
         if (dy <= 0 || isLoading.get() || !hasMorePages || isDestroyed.get()) {
             return false;
         }
-        
+
         try {
             int visibleItemCount = gridLayoutManager.getChildCount();
             int totalItemCount = gridLayoutManager.getItemCount();
@@ -216,27 +241,23 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     }
 
     private void loadTrendingContent() {
-        if (isLoading.get() || isDestroyed.get()) {
-            return;
-        }
+        if (isLoading.get() || isDestroyed.get()) return;
 
         isLoading.set(true);
         isInitialLoad = true;
         retryAttempts = 0;
         showLoadingIndicator();
-        
+
         performSearch();
     }
 
     private void performSearch() {
-        if (isDestroyed.get()) {
-            return;
-        }
+        if (isDestroyed.get()) return;
 
         try {
             lastQuery = TrendingContentManager.getTrending("songs");
             SearchResultHandler handler = new SearchResultHandler(this);
-            
+
             if (searchManager != null) {
                 searchManager.setSearchResultListener(handler);
                 searchManager.searchYouTube(lastQuery, handler);
@@ -250,13 +271,11 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     }
 
     private void loadMoreContent() {
-        if (isLoading.get() || !hasMorePages || isDestroyed.get()) {
-            return;
-        }
-        
+        if (isLoading.get() || !hasMorePages || isDestroyed.get()) return;
+
         isLoading.set(true);
         isInitialLoad = false;
-        
+
         try {
             if (searchManager != null) {
                 searchManager.loadMoreResults();
@@ -264,18 +283,17 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
         } catch (Exception e) {
             Log.e(TAG, "Error loading more content", e);
             isLoading.set(false);
+            safeToast("Failed to load more videos.");
         }
     }
 
     private void refreshContent() {
-        if (isDestroyed.get()) {
-            return;
-        }
+        if (isDestroyed.get()) return;
 
         synchronized (videoList) {
             videoList.clear();
         }
-        
+
         if (videoAdapter != null && !isDestroyed.get()) {
             runOnUiThread(() -> {
                 if (videoAdapter != null && !isDestroyed.get()) {
@@ -283,10 +301,10 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
                 }
             });
         }
-        
+
         hasMorePages = true;
         retryAttempts = 0;
-        
+
         if (searchManager != null) {
             try {
                 searchManager.clearSearchCache();
@@ -294,37 +312,47 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
                 Log.w(TAG, "Error clearing search cache", e);
             }
         }
-        
+
         loadTrendingContent();
     }
 
     private void showLoadingIndicator() {
         runOnUiThread(() -> {
-            if (binding != null && !isDestroyed.get()) {
-                binding.progressBar.setVisibility(View.VISIBLE);
+            try {
+                if (binding != null && !isDestroyed.get()) {
+                    binding.progressBar.setVisibility(View.VISIBLE);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to show loading indicator", e);
             }
         });
     }
 
     private void hideLoadingIndicator() {
         runOnUiThread(() -> {
-            if (binding != null && !isDestroyed.get()) {
-                binding.progressBar.setVisibility(View.GONE);
-                binding.swipeRefreshLayout.setRefreshing(false);
+            try {
+                if (binding != null && !isDestroyed.get()) {
+                    binding.progressBar.setVisibility(View.GONE);
+                    binding.swipeRefreshLayout.setRefreshing(false);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to hide loading indicator", e);
             }
         });
     }
 
     private void showError(String message) {
-        runOnUiThread(() -> {
+        runOnUiThread(() -> safeToast(message));
+    }
+
+    private void safeToast(String msg) {
+        try {
             if (isAdded() && getContext() != null && !isDestroyed.get()) {
-                try {
-                    Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-                } catch (Exception e) {
-                    Log.w(TAG, "Error showing toast", e);
-                }
+                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
             }
-        });
+        } catch (Exception e) {
+            Log.w(TAG, "Error showing toast", e);
+        }
     }
 
     private void runOnUiThread(Runnable action) {
@@ -336,15 +364,13 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     private void handleSearchError(String defaultMessage, boolean shouldRetry) {
         isLoading.set(false);
         hideLoadingIndicator();
-        
+
         if (shouldRetry && retryAttempts < MAX_RETRY_ATTEMPTS && !isDestroyed.get()) {
             retryAttempts++;
             Log.d(TAG, "Retrying search, attempt " + retryAttempts + "/" + MAX_RETRY_ATTEMPTS);
-            
+
             mainHandler.postDelayed(() -> {
-                if (!isDestroyed.get()) {
-                    performSearch();
-                }
+                if (!isDestroyed.get()) performSearch();
             }, RETRY_DELAY_MS);
         } else {
             showError(defaultMessage);
@@ -352,18 +378,15 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     }
 
     private boolean isValidStreamItem(StreamInfoItem item) {
-        return item != null && 
-               item.getUrl() != null && 
-               !item.getUrl().trim().isEmpty() &&
-               item.getName() != null && 
-               !item.getName().trim().isEmpty();
+        return item != null &&
+                item.getUrl() != null &&
+                !item.getUrl().trim().isEmpty() &&
+                item.getName() != null &&
+                !item.getName().trim().isEmpty();
     }
 
     private boolean isAcceptableVideo(StreamInfoItem item) {
-        if (!isValidStreamItem(item)) {
-            return false;
-        }
-        
+        if (!isValidStreamItem(item)) return false;
         long duration = item.getDuration();
         return duration > MINIMUM_VIDEO_DURATION || duration == -1;
     }
@@ -381,11 +404,11 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
             intent.putExtra(EXTRA_VIDEO_TITLE, videoItem.getName());
             intent.putExtra(EXTRA_CHANNEL_NAME, videoItem.getUploaderName());
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            
+
             if (isAndroidTV) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             }
-            
+
             startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Error opening video: " + videoItem.getUrl(), e);
@@ -404,20 +427,24 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     @Override
     public void onResume() {
         super.onResume();
-        if (!isDestroyed.get() && videoList.isEmpty() && !isLoading.get()) {
-            loadTrendingContent();
+        try {
+            if (!isDestroyed.get() && videoList.isEmpty() && !isLoading.get()) {
+                loadTrendingContent();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onResume", e);
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (searchManager != null) {
-            try {
+        try {
+            if (searchManager != null) {
                 searchManager.cancelCurrentSearch();
-            } catch (Exception e) {
-                Log.w(TAG, "Error cancelling search on pause", e);
             }
+        } catch (Exception e) {
+            Log.w(TAG, "Error cancelling search on pause", e);
         }
     }
 
@@ -430,27 +457,30 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
     }
 
     private void cleanup() {
-        if (searchManager != null) {
-            try {
+        try {
+            if (searchManager != null) {
                 searchManager.cancelCurrentSearch();
                 searchManager.setSearchResultListener(null);
-            } catch (Exception e) {
-                Log.w(TAG, "Error during search manager cleanup", e);
             }
+
+            if (mainHandler != null) {
+                mainHandler.removeCallbacksAndMessages(null);
+            }
+
+            synchronized (videoList) {
+                videoList.clear();
+            }
+
+            videoAdapter = null;
+            gridLayoutManager = null;
+        } catch (Exception e) {
+            Log.w(TAG, "Cleanup error", e);
         }
-        
-        if (mainHandler != null) {
-            mainHandler.removeCallbacksAndMessages(null);
-        }
-        
-        synchronized (videoList) {
-            videoList.clear();
-        }
-        
-        videoAdapter = null;
-        gridLayoutManager = null;
     }
 
+    /**
+     * Handles SearchManager callbacks safely.
+     */
     private static class SearchResultHandler implements SearchManager.SearchResultListener {
         private final WeakReference<HomeFragment> fragmentRef;
 
@@ -466,17 +496,13 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
         @Override
         public void onSearchStarted(String query) {
             HomeFragment fragment = getFragment();
-            if (fragment != null) {
-                Log.d(TAG, "Loading trending content: " + query);
-            }
+            if (fragment != null) Log.d(TAG, "Loading trending content: " + query);
         }
 
         @Override
         public void onSearchResults(SearchManager.SearchResults results) {
             HomeFragment fragment = getFragment();
-            if (fragment == null || results == null) {
-                return;
-            }
+            if (fragment == null || results == null) return;
 
             fragment.isLoading.set(false);
             fragment.hideLoadingIndicator();
@@ -505,7 +531,7 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
                     oldSize = fragment.videoList.size();
                     fragment.videoList.addAll(validItems);
                 }
-                
+
                 fragment.runOnUiThread(() -> {
                     if (fragment.videoAdapter != null && !fragment.isDestroyed.get()) {
                         if (fragment.isInitialLoad) {
@@ -533,18 +559,16 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
         @Override
         public void onSearchError(SearchManager.SearchError error) {
             HomeFragment fragment = getFragment();
-            if (fragment == null || error == null) {
-                return;
-            }
+            if (fragment == null || error == null) return;
 
             fragment.isLoading.set(false);
             fragment.hideLoadingIndicator();
 
             Log.e(TAG, "Search error: " + error.message, error.exception);
-            
+
             String errorMessage;
             boolean shouldRetry = false;
-            
+
             switch (error.type) {
                 case NO_RESULTS_FOUND:
                     errorMessage = fragment.isInitialLoad ? "No trending videos found" : null;
@@ -562,7 +586,7 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
                     shouldRetry = true;
                     break;
             }
-            
+
             if (errorMessage != null) {
                 fragment.handleSearchError(errorMessage, shouldRetry);
             }
@@ -571,12 +595,10 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
         @Override
         public void onMoreResultsLoaded(List<InfoItem> items, boolean hasMorePages) {
             HomeFragment fragment = getFragment();
-            if (fragment == null || items == null) {
-                return;
-            }
+            if (fragment == null || items == null) return;
 
             fragment.isLoading.set(false);
-            
+
             try {
                 List<StreamInfoItem> validItems = new ArrayList<>();
                 for (InfoItem item : items) {
@@ -591,7 +613,7 @@ public class HomeFragment extends Fragment implements VideoAdapter.OnVideoItemCl
                         oldSize = fragment.videoList.size();
                         fragment.videoList.addAll(validItems);
                     }
-                    
+
                     fragment.runOnUiThread(() -> {
                         if (fragment.videoAdapter != null && !fragment.isDestroyed.get()) {
                             fragment.videoAdapter.notifyItemRangeInserted(oldSize, validItems.size());

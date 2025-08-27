@@ -158,6 +158,7 @@ public class DebugActivity extends Activity {
             prefs.edit()
                  .remove(PREF_CRASH_LOG_KEY)
                  .remove(PREF_CRASH_LOG_KEY + "_time")
+                 .remove(PREF_CRASH_LOG_KEY + "_description")
                  .apply();
             Log.d("DebugActivity", "Crash log cleared");
         } catch (Exception e) {

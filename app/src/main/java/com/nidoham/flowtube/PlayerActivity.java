@@ -1,10 +1,15 @@
 package com.nidoham.flowtube;
 
+import android.app.UiModeManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -29,6 +34,11 @@ public class PlayerActivity extends AppCompatActivity {
     private Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isDestroyed = false;
     private boolean isFullscreen = false;
+    private boolean isLandscape = false;
+    private boolean isAndroidTv = false;
+
+    private Runnable controlsHideRunnable;
+    private static final int CONTROLS_HIDE_DELAY_MS = 2000;
 
     public static final String EXTRA_VIDEO_URL = "video_url";
     public static final String EXTRA_VIDEO_TITLE = "video_title";
@@ -51,6 +61,7 @@ public class PlayerActivity extends AppCompatActivity {
             binding = ActivityPlayerBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
         } catch (Exception e) {
+            e.printStackTrace();
             Toast.makeText(this, "Failed to inflate layout: " + e.getMessage(), Toast.LENGTH_LONG).show();
             finish();
             return;
@@ -58,8 +69,16 @@ public class PlayerActivity extends AppCompatActivity {
 
         setupSystemUI();
 
+        // Detect if device is Android TV (compact mode)
+        isAndroidTv = isAndroidTvDevice();
+
+        // Determine orientation
+        int orientation = getResources().getConfiguration().orientation;
+        isLandscape = (orientation == Configuration.ORIENTATION_LANDSCAPE);
+
         playerViewModel = new ViewModelProvider(this).get(PlayerViewModel.class);
 
+        // Restore instance state or intent
         if (savedInstanceState != null) {
             videoUrl = safeGetString(savedInstanceState, EXTRA_VIDEO_URL, "");
             videoTitle = safeGetString(savedInstanceState, EXTRA_VIDEO_TITLE, "");
@@ -82,17 +101,18 @@ public class PlayerActivity extends AppCompatActivity {
         playerViewModel.initPlayer(this);
         final ExoPlayer player = playerViewModel.getPlayer();
 
-        // Always bind player after orientation change
         try {
-            binding.playerView.setPlayer(player);
+            if (binding != null && binding.playerView != null) {
+                binding.playerView.setPlayer(player);
+            }
         } catch (Exception e) {
+            e.printStackTrace();
             Toast.makeText(this, "Failed to attach player: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
 
-        // Only load video URL ONCE, use saved directVideoUrl after orientation change
         if (isFirstCreate) {
             if (videoUrl != null && !videoUrl.isEmpty() && isYouTubeUrl(videoUrl)) {
-                binding.loadingIndicator.setVisibility(View.VISIBLE);
+                showLoading(true);
                 final long finalPlaybackPosition = playbackPosition;
                 YouTubeDirectLink.getDirectLink(this, videoUrl, new YouTubeDirectLink.DirectLinkCallback() {
                     @Override
@@ -101,11 +121,12 @@ public class PlayerActivity extends AppCompatActivity {
                             try {
                                 if (!isDestroyed && playerViewModel != null) {
                                     directVideoUrl = directUrl;
-                                    binding.loadingIndicator.setVisibility(View.GONE);
+                                    showLoading(false);
                                     playerViewModel.loadMedia(directUrl);
                                     if (finalPlaybackPosition > 0) player.seekTo(finalPlaybackPosition);
                                 }
                             } catch (Exception e) {
+                                e.printStackTrace();
                                 Toast.makeText(PlayerActivity.this, "Failed to start video: " + e.getMessage(), Toast.LENGTH_LONG).show();
                                 finish();
                             }
@@ -114,23 +135,24 @@ public class PlayerActivity extends AppCompatActivity {
                     @Override
                     public void onError(Exception e) {
                         mainHandler.post(() -> {
-                            binding.loadingIndicator.setVisibility(View.GONE);
+                            showLoading(false);
                             Toast.makeText(PlayerActivity.this, "Failed to load video: " + e.getMessage(), Toast.LENGTH_LONG).show();
                             finish();
                         });
                     }
                 });
             } else if (videoUrl != null && !videoUrl.isEmpty()) {
-                binding.loadingIndicator.setVisibility(View.VISIBLE);
+                showLoading(true);
                 try {
                     directVideoUrl = videoUrl;
                     playerViewModel.loadMedia(videoUrl);
                     if (playbackPosition > 0) player.seekTo(playbackPosition);
                 } catch (Exception e) {
+                    e.printStackTrace();
                     Toast.makeText(this, "Failed to load video: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     finish();
                 }
-                binding.loadingIndicator.setVisibility(View.GONE);
+                showLoading(false);
             } else {
                 Toast.makeText(this, "Invalid video URL", Toast.LENGTH_LONG).show();
                 finish();
@@ -142,21 +164,23 @@ public class PlayerActivity extends AppCompatActivity {
                 }
                 if (playbackPosition > 0) player.seekTo(playbackPosition);
             } catch (Exception e) {
+                e.printStackTrace();
                 Toast.makeText(this, "Failed to restore video position: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         }
 
-        // Play/Pause
+        // Play/Pause Button
         safeSetOnClickListener(binding.btnPlayPause, v -> {
             try {
                 if (player.isPlaying()) playerViewModel.pause();
                 else playerViewModel.play();
             } catch (Exception e) {
+                e.printStackTrace();
                 Toast.makeText(this, "Player error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
 
-        // Replay 10
+        // Replay 10s Button
         safeSetOnClickListener(binding.btnReplay10, v -> {
             try {
                 final long pos = player.getCurrentPosition();
@@ -166,7 +190,7 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
 
-        // Forward 10
+        // Forward 10s Button
         safeSetOnClickListener(binding.btnForward10, v -> {
             try {
                 final long pos = player.getCurrentPosition();
@@ -177,18 +201,37 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
 
-        // Orientation Button
+        // Orientation Button (different for TV and Phone)
         safeSetOnClickListener(binding.btnOrientation, v -> {
             try {
-                if (getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
-                    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                    isFullscreen = false;
+                if (isAndroidTv) {
+                    // TV: Toggle immersive fullscreen, but don't rotate screen
+                    isFullscreen = !isFullscreen;
+                    if (isFullscreen) hideSystemUI();
+                    else showSystemUI();
                 } else {
-                    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-                    isFullscreen = true;
-                    hideSystemUI();
+                    // Phone: Use Android 15 recommended orientation APIs if available, else fallback
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // Android 15
+                        int newOrientation = (getDisplay().getRotation() % 2 == 0)
+                                ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+                        setRequestedOrientation(newOrientation);
+                        isFullscreen = (newOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                    } else {
+                        int orientation1 = getResources().getConfiguration().orientation;
+                        if (orientation1 == Configuration.ORIENTATION_LANDSCAPE) {
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                            isFullscreen = false;
+                        } else {
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                            isFullscreen = true;
+                        }
+                    }
+                    if (isFullscreen) hideSystemUI();
+                    else showSystemUI();
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 Toast.makeText(this, "Failed to change orientation: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
@@ -198,18 +241,20 @@ public class PlayerActivity extends AppCompatActivity {
             try {
                 finish();
             } catch (Exception e) {
+                e.printStackTrace();
                 Toast.makeText(this, "Failed to exit: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
 
-        // SeekBar setup
+        // SeekBar
         final SeekBar seekBar = binding.videoProgress;
-        seekBar.setMax(1000);
+        if (seekBar != null) seekBar.setMax(1000);
 
-        final ExoPlayer.Listener progressListener = new Player.Listener() {
+        // Progress Listener
+        final Player.Listener progressListener = new Player.Listener() {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
-                try { updatePlayPauseButton(player.isPlaying()); } catch (Exception ignored) {}
+                try { updatePlayPauseButton(player != null && player.isPlaying()); } catch (Exception ignored) {}
             }
             @Override
             public void onPlaybackStateChanged(int state) {
@@ -222,6 +267,7 @@ public class PlayerActivity extends AppCompatActivity {
         };
         try { player.addListener(progressListener); } catch (Exception ignored) {}
 
+        // Periodic SeekBar Update
         mainHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -232,34 +278,137 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }, 500);
 
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            boolean wasPlaying = false;
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                try { wasPlaying = player.isPlaying(); playerViewModel.pause(); } catch (Exception ignored) {}
-            }
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                try {
-                    final int progress = seekBar.getProgress();
-                    final long duration = player.getDuration();
-                    if (duration > 0) {
-                        long seekTo = (progress * duration) / 1000;
-                        player.seekTo(seekTo);
-                    }
-                    if (wasPlaying) playerViewModel.play();
-                } catch (Exception ignored) {}
-            }
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) { }
-        });
+        // SeekBar Change Listener
+        if (seekBar != null) {
+            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                boolean wasPlaying = false;
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                    try { wasPlaying = player != null && player.isPlaying(); playerViewModel.pause(); } catch (Exception ignored) {}
+                }
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                    try {
+                        final int progress = seekBar.getProgress();
+                        final long duration = player != null ? player.getDuration() : 0;
+                        if (duration > 0) {
+                            long seekTo = (progress * duration) / 1000;
+                            if (player != null) player.seekTo(seekTo);
+                        }
+                        if (wasPlaying) playerViewModel.play();
+                    } catch (Exception ignored) {}
+                }
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) { }
+            });
+        }
 
-        // Metadata display
         safeSetText(binding.txtTitle, videoTitle != null ? videoTitle : "Untitled");
         safeSetText(binding.txtChannelName, channelName != null ? channelName : "");
 
-        // Hide system UI if fullscreen
+        // Touch controls to show/hide overlays as requested
+        setupControlsOverlayAutoHide();
+
+        // Initial overlays visibility
+        if (isLandscape && !isAndroidTv) {
+            setAllControlsVisible(false); // landscape phone: only playerView visible
+        } else {
+            setControlsOverlayVisible(false); // portrait phone: controlsOverlay hidden
+        }
+
         if (isFullscreen) hideSystemUI();
+        else showSystemUI();
+    }
+
+    private void setupControlsOverlayAutoHide() {
+        // Touch listener for the playerView surface
+        View touchSurface = binding.playerView;
+        if (touchSurface == null) return;
+
+        touchSurface.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                // Cancel any existing hide timer
+                if (controlsHideRunnable != null) {
+                    mainHandler.removeCallbacks(controlsHideRunnable);
+                }
+                
+                if (isLandscape && !isAndroidTv) {
+                    // Phone landscape: toggle all controls
+                    if (areAllControlsVisible()) {
+                        // Controls are visible - hide them immediately
+                        setAllControlsVisible(false);
+                    } else {
+                        // Controls are hidden - show them and start timer
+                        setAllControlsVisible(true);
+                        startHideTimer();
+                    }
+                } else {
+                    // Portrait phone or TV: toggle controls overlay
+                    if (isControlsOverlayVisible()) {
+                        // Controls are visible - hide them immediately
+                        setControlsOverlayVisible(false);
+                    } else {
+                        // Controls are hidden - show them and start timer
+                        setControlsOverlayVisible(true);
+                        startHideTimer();
+                    }
+                }
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void startHideTimer() {
+        // Clear any existing timer
+        if (controlsHideRunnable != null) {
+            mainHandler.removeCallbacks(controlsHideRunnable);
+        }
+        
+        // Create new timer runnable
+        controlsHideRunnable = () -> {
+            try {
+                if (isLandscape && !isAndroidTv) {
+                    setAllControlsVisible(false);
+                } else {
+                    setControlsOverlayVisible(false);
+                }
+            } catch (Exception ignored) {
+                // Handle any potential exceptions during UI updates
+            }
+        };
+        
+        // Start the timer
+        mainHandler.postDelayed(controlsHideRunnable, CONTROLS_HIDE_DELAY_MS);
+    }
+
+    // For portrait: only controlsOverlay
+    private void setControlsOverlayVisible(boolean visible) {
+        try {
+            if (binding.controlsOverlay != null) {
+                binding.controlsOverlay.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+            }
+        } catch (Exception ignored) {}
+    }
+    private boolean isControlsOverlayVisible() {
+        try {
+            return binding.controlsOverlay != null && binding.controlsOverlay.getVisibility() == View.VISIBLE;
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    // For landscape: everything except playerView
+    private void setAllControlsVisible(boolean visible) {
+        try {
+            if (binding.controlsOverlay != null) binding.controlsOverlay.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+            // You can add more overlay controls here if you want to also hide/show other views
+        } catch (Exception ignored) {}
+    }
+    private boolean areAllControlsVisible() {
+        try {
+            return binding.controlsOverlay != null && binding.controlsOverlay.getVisibility() == View.VISIBLE;
+        } catch (Exception ignored) {}
+        return false;
     }
 
     private boolean isYouTubeUrl(String url) {
@@ -271,29 +420,43 @@ public class PlayerActivity extends AppCompatActivity {
         try {
             getWindow().setStatusBarColor(ContextCompat.getColor(this, android.R.color.black));
             getWindow().setNavigationBarColor(ContextCompat.getColor(this, android.R.color.black));
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) { ignored.printStackTrace(); }
+    }
+
+    private void showLoading(boolean show) {
+        try {
+            if (binding != null && binding.loadingIndicator != null) {
+                binding.loadingIndicator.setVisibility(show ? View.VISIBLE : View.GONE);
+            }
+        } catch (Exception ignored) { ignored.printStackTrace(); }
     }
 
     private void updatePlayPauseButton(boolean isPlaying) {
         try {
-            int iconRes = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
-            binding.btnPlayPause.setImageResource(iconRes);
-        } catch (Exception ignored) {}
+            if (binding != null && binding.btnPlayPause != null) {
+                int iconRes = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
+                binding.btnPlayPause.setImageResource(iconRes);
+            }
+        } catch (Exception ignored) { ignored.printStackTrace(); }
     }
 
     private void updateSeekBar(Player player, SeekBar seekBar) {
         try {
-            long duration = player.getDuration();
-            long position = player.getCurrentPosition();
-            if (duration > 0) {
-                int progress = (int) ((position * 1000) / duration);
-                seekBar.setProgress(progress);
-            } else {
-                seekBar.setProgress(0);
+            long duration = player != null ? player.getDuration() : 0;
+            long position = player != null ? player.getCurrentPosition() : 0;
+            if (seekBar != null) {
+                if (duration > 0) {
+                    int progress = (int) ((position * 1000) / duration);
+                    seekBar.setProgress(progress);
+                } else {
+                    seekBar.setProgress(0);
+                }
             }
-            safeSetText(binding.txtCurrentTime, formatTime(position));
-            safeSetText(binding.txtTotalTime, formatTime(duration));
-        } catch (Exception ignored) {}
+            safeSetText(binding != null ? binding.txtCurrentTime : null, formatTime(position));
+            safeSetText(binding != null ? binding.txtTotalTime : null, formatTime(duration));
+        } catch (Exception ignored) {
+            ignored.printStackTrace();
+        }
     }
 
     private String formatTime(long millis) {
@@ -309,7 +472,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void hideSystemUI() {
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 WindowInsetsController controller = getWindow().getInsetsController();
                 if (controller != null) {
                     controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
@@ -325,25 +488,41 @@ public class PlayerActivity extends AppCompatActivity {
                                 | View.SYSTEM_UI_FLAG_FULLSCREEN
                 );
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) { ignored.printStackTrace(); }
+    }
+
+    private void showSystemUI() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                WindowInsetsController controller = getWindow().getInsetsController();
+                if (controller != null) {
+                    controller.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                }
+            } else {
+                getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+            }
+        } catch (Exception ignored) { ignored.printStackTrace(); }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        try { playerViewModel.pause(); } catch (Exception ignored) {}
+        try { if (playerViewModel != null) playerViewModel.pause(); } catch (Exception ignored) { ignored.printStackTrace(); }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        try { playerViewModel.resume(); } catch (Exception ignored) {}
+        try { if (playerViewModel != null) playerViewModel.resume(); } catch (Exception ignored) { ignored.printStackTrace(); }
     }
 
     @Override
     protected void onDestroy() {
         isDestroyed = true;
-        try { playerViewModel.release(); } catch (Exception ignored) {}
+        try {
+            if (playerViewModel != null) playerViewModel.release();
+        } catch (Exception ignored) {}
+        if (controlsHideRunnable != null) mainHandler.removeCallbacks(controlsHideRunnable);
         binding = null;
         super.onDestroy();
     }
@@ -365,16 +544,16 @@ public class PlayerActivity extends AppCompatActivity {
             outState.putString(EXTRA_VIDEO_TITLE, videoTitle);
             outState.putString(EXTRA_CHANNEL_NAME, channelName);
             outState.putString(EXTRA_DIRECT_VIDEO_URL, directVideoUrl);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) { ignored.printStackTrace(); }
     }
 
     // Helper: set text safely
     private void safeSetText(android.widget.TextView tv, String text) {
-        try { if (tv != null) tv.setText(text); } catch (Exception ignored) {}
+        try { if (tv != null) tv.setText(text); } catch (Exception ignored) { ignored.printStackTrace(); }
     }
     // Helper: set click listener safely
     private void safeSetOnClickListener(View view, View.OnClickListener listener) {
-        try { if (view != null) view.setOnClickListener(listener); } catch (Exception ignored) {}
+        try { if (view != null) view.setOnClickListener(listener); } catch (Exception ignored) { ignored.printStackTrace(); }
     }
     // Helper: get string extra safely
     private String safeGetString(Bundle bundle, String key, String defaultValue) {
@@ -384,5 +563,14 @@ public class PlayerActivity extends AppCompatActivity {
     private String safeGetString(Intent intent, String key, String defaultValue) {
         try { String result = intent.getStringExtra(key); return result != null ? result : defaultValue; }
         catch (Exception e) { return defaultValue; }
+    }
+    // Helper: detect Android TV device
+    private boolean isAndroidTvDevice() {
+        try {
+            UiModeManager uiModeManager = (UiModeManager) getSystemService(Context.UI_MODE_SERVICE);
+            return uiModeManager != null && uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
