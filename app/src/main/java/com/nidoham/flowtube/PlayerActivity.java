@@ -62,6 +62,10 @@ public class PlayerActivity extends AppCompatActivity {
     // Stream extraction features
     private StreamExtractor streamExtractor;
 
+    // Store extracted URLs for separate streams
+    private String extractedVideoUrl = "";
+    private String extractedAudioUrl = "";
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -123,24 +127,43 @@ public class PlayerActivity extends AppCompatActivity {
         if (isFirstCreate) {
             if (videoUrl != null && !videoUrl.isEmpty() && isYouTubeUrl(videoUrl)) {
                 showLoading(true);
+
+                // Use a holder array to enable updating from lambda
+                final String[] videoUrlHolder = {""};
+                final String[] audioUrlHolder = {""};
+
                 streamExtractor.extractAll(videoUrl, new StreamExtractor.OnStreamExtractionListener() {
                     @Override
-                    public void onVideoReady(@NonNull String extractedVideoUrl) {
+                    public void onVideoReady(@NonNull String url) {
                         runOnUiThread(() -> {
-                            Log.d(TAG, "Extracted video URL: " + extractedVideoUrl);
-                            directVideoUrl = extractedVideoUrl;
-                            playerViewModel.loadMedia(extractedVideoUrl);
-                            if (playbackPosition > 0 && player != null) {
-                                player.seekTo(playbackPosition);
+                            Log.d(TAG, "Extracted video URL: " + url);
+                            videoUrlHolder[0] = url;
+                            extractedVideoUrl = url;
+                            // Try to play if we already have audio
+                            if (!audioUrlHolder[0].isEmpty()) {
+                                playerViewModel.loadMediaWithSeparateStreams(videoUrlHolder[0], audioUrlHolder[0]);
+                                if (playbackPosition > 0 && player != null) {
+                                    player.seekTo(playbackPosition);
+                                }
+                                showLoading(false);
                             }
                         });
                     }
 
                     @Override
-                    public void onAudioReady(@NonNull String extractedAudioUrl) {
+                    public void onAudioReady(@NonNull String url) {
                         runOnUiThread(() -> {
-                            Log.d(TAG, "Extracted audio URL: " + extractedAudioUrl);
-                            // You can process or display the audio URL as needed
+                            Log.d(TAG, "Extracted audio URL: " + url);
+                            audioUrlHolder[0] = url;
+                            extractedAudioUrl = url;
+                            // Try to play if we already have video
+                            if (!videoUrlHolder[0].isEmpty()) {
+                                playerViewModel.loadMediaWithSeparateStreams(videoUrlHolder[0], audioUrlHolder[0]);
+                                if (playbackPosition > 0 && player != null) {
+                                    player.seekTo(playbackPosition);
+                                }
+                                showLoading(false);
+                            }
                         });
                     }
 
@@ -162,6 +185,7 @@ public class PlayerActivity extends AppCompatActivity {
                         });
                     }
                 });
+
             } else if (videoUrl != null && !videoUrl.isEmpty()) {
                 showLoading(true);
                 try {
