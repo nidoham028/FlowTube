@@ -1,39 +1,201 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/layout_root"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp">
+<LinearLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+     android:layout_height="match_parent"
+     android:layout_width="match_parent"
+     android:padding="16dp"
+     android:orientation="vertical">
 
-    <EditText
-        android:id="@+id/input_url"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter YouTube video URL"
-        android:inputType="textUri"
-        android:singleLine="true" />
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="wrap_content"
+         android:layout_marginBottom="24dp"
+         android:textSize="24sp"
+         android:text="YouTube Stream Extractor Test"
+         android:textStyle="bold"
+         android:layout_gravity="center_horizontal" />
+
+    <com.google.android.material.textfield.TextInputLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:layout_marginBottom="16dp"
+         android:hint="Enter YouTube URL">
+
+        <com.google.android.material.textfield.TextInputEditText
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:textSize="16sp"
+             android:maxLines="3"
+             android:inputType="textUri"
+             android:id="@+id/editTextYouTubeUrl" />
+
+    </com.google.android.material.textfield.TextInputLayout>
 
     <Button
-        android:id="@+id/fetch_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Fetch Streams"
-        android:layout_marginTop="16dp" />
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:layout_marginBottom="20dp"
+         android:paddingVertical="12dp"
+         android:textSize="16sp"
+         android:id="@+id/buttonExtract"
+         android:text="Extract Streams" />
+
+    <ProgressBar
+         android:layout_height="wrap_content"
+         android:layout_width="wrap_content"
+         android:layout_marginBottom="16dp"
+         android:visibility="gone"
+         android:id="@+id/progressBarExtraction"
+         android:layout_gravity="center_horizontal" />
+
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:layout_marginBottom="20dp"
+         android:gravity="center"
+         android:padding="12dp"
+         android:textSize="14sp"
+         android:id="@+id/textViewStatus"
+         android:text="Status: Ready for extraction" />
 
     <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:paddingTop="24dp">
+         android:layout_height="0dp"
+         android:layout_width="match_parent"
+         android:fillViewport="true"
+         android:layout_weight="1">
 
-        <TextView
-            android:id="@+id/result_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Results will appear here"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+        <LinearLayout
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:orientation="vertical">
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:layout_marginBottom="16dp"
+                 android:textSize="18sp"
+                 android:text="Extraction Results"
+                 android:textStyle="bold" />
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="match_parent"
+                 android:layout_marginBottom="12dp"
+                 android:padding="8dp"
+                 android:textSize="14sp"
+                 android:id="@+id/textViewVideoInfo"
+                 android:text="Video Information: Not extracted"
+                 android:textStyle="italic" />
+
+            <androidx.cardview.widget.CardView
+                 android:layout_height="wrap_content"
+                 android:layout_width="match_parent"
+                 android:layout_marginBottom="12dp"
+                 app:cardElevation="3dp"
+                 app:cardCornerRadius="8dp">
+
+                <LinearLayout
+                     android:layout_height="wrap_content"
+                     android:layout_width="match_parent"
+                     android:padding="16dp"
+                     android:orientation="vertical">
+
+                    <TextView
+                         android:layout_height="wrap_content"
+                         android:layout_width="wrap_content"
+                         android:layout_marginBottom="8dp"
+                         android:textSize="16sp"
+                         android:text="Video Stream"
+                         android:textStyle="bold" />
+
+                    <TextView
+                         android:layout_height="wrap_content"
+                         android:layout_width="match_parent"
+                         android:padding="8dp"
+                         android:textSize="12sp"
+                         android:textIsSelectable="true"
+                         android:id="@+id/textViewVideoUrl"
+                         android:text="Video URL: Not extracted" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                 android:layout_height="wrap_content"
+                 android:layout_width="match_parent"
+                 android:layout_marginBottom="12dp"
+                 app:cardElevation="3dp"
+                 app:cardCornerRadius="8dp">
+
+                <LinearLayout
+                     android:layout_height="wrap_content"
+                     android:layout_width="match_parent"
+                     android:padding="16dp"
+                     android:orientation="vertical">
+
+                    <TextView
+                         android:layout_height="wrap_content"
+                         android:layout_width="wrap_content"
+                         android:layout_marginBottom="8dp"
+                         android:textSize="16sp"
+                         android:text="Audio Stream"
+                         android:textStyle="bold" />
+
+                    <TextView
+                         android:layout_height="wrap_content"
+                         android:layout_width="match_parent"
+                         android:padding="8dp"
+                         android:textSize="12sp"
+                         android:textIsSelectable="true"
+                         android:id="@+id/textViewAudioUrl"
+                         android:text="Audio URL: Not extracted" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
 
     </ScrollView>
+
+    <LinearLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:orientation="horizontal"
+         android:layout_marginTop="16dp">
+
+        <Button
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:layout_marginEnd="8dp"
+             android:paddingVertical="10dp"
+             android:layout_weight="1"
+             android:id="@+id/buttonClear"
+             android:text="Clear" />
+
+        <Button
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:layout_marginEnd="4dp"
+             android:paddingVertical="10dp"
+             android:enabled="false"
+             android:layout_marginStart="4dp"
+             android:layout_weight="1"
+             android:id="@+id/buttonCopyVideo"
+             android:text="Copy Video" />
+
+        <Button
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:paddingVertical="10dp"
+             android:enabled="false"
+             android:layout_marginStart="8dp"
+             android:layout_weight="1"
+             android:id="@+id/buttonCopyAudio"
+             android:text="Copy Audio" />
+
+    </LinearLayout>
 
 </LinearLayout>

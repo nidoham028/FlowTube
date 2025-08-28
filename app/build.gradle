@@ -152,13 +152,14 @@ dependencies {
     // ===============================================
     def media3_version = "1.4.0"
     implementation "androidx.media3:media3-exoplayer:$media3_version"
-    implementation "androidx.media3:media3-exoplayer-hls:$media3_version"
     implementation "androidx.media3:media3-ui:$media3_version"
     implementation "androidx.media3:media3-session:$media3_version"
-    implementation "androidx.media3:media3-datasource-okhttp:$media3_version"
     implementation "androidx.media3:media3-common:$media3_version"
-    implementation 'androidx.media:media:1.7.0'
-
+    implementation "androidx.media3:media3-datasource:media3_version"
+    implementation "androidx.media3:media3-datasource-okhttp:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-dash:$media3_version"
+    
     // ===============================================
     // কোটলিন এবং কোর ল্যাঙ্গুয়েজ ডিপেন্ডেন্সি
     // ===============================================
