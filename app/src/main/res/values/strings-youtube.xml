@@ -3,4 +3,10 @@
     <string name="youtube_restricted_mode_enabled">youtube_restricted_mode_enabled</string>
     <string name="recaptcha_cookies_key">recaptcha_cookies</string>
     <string name="show_meta_info_key">show_meta_info</string>
+    
+    <!-- Add these lines if they don't exist -->
+    <string name="image_quality_key">image_quality</string>
+    <string name="image_quality_default">high</string>
+    <string name="show_image_indicators_key">show_image_indicators</string>
+    <string name="report_disposed_rx_exceptions_key">report_disposed_rx_exceptions</string>
 </resources>

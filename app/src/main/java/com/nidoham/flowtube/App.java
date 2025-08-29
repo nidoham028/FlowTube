@@ -14,19 +14,35 @@ import androidx.preference.PreferenceManager;
 
 import com.nidoham.strivo.settings.ApplicationSettings;
 import com.nidoham.flowtube.core.language.AppLanguage;
+
+import io.reactivex.rxjava3.exceptions.CompositeException;
+import io.reactivex.rxjava3.exceptions.MissingBackpressureException;
+import io.reactivex.rxjava3.exceptions.OnErrorNotImplementedException;
+import io.reactivex.rxjava3.exceptions.UndeliverableException;
+import io.reactivex.rxjava3.functions.Consumer;
+import io.reactivex.rxjava3.plugins.RxJavaPlugins;
 import org.acra.ACRA;
 import org.schabi.newpipe.error.ReCaptchaActivity;
 import com.nidoham.strivo.Localization.Localizations;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.util.InfoCache;
+import org.schabi.newpipe.util.image.ImageStrategy;
+import org.schabi.newpipe.util.image.PreferredImageQuality;
 import org.schabi.newpipe.util.image.PicassoHelper;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.Thread.UncaughtExceptionHandler;
+import java.net.SocketException;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class App extends Application {
@@ -54,10 +70,134 @@ public class App extends Application {
         defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(this::handleUncaughtException);
 
+        final SharedPreferences prefs = getDefaultSharedPreferences();
+
+        // Initialize image loader
+        PicassoHelper.init(this);
+        ImageStrategy.setPreferredImageQuality(PreferredImageQuality.fromPreferenceKey(this,
+                prefs.getString(getString(R.string.image_quality_key),
+                        getString(R.string.image_quality_default))));
+        PicassoHelper.setIndicatorsEnabled(DEBUG
+                && prefs.getBoolean(getString(R.string.show_image_indicators_key), false));
+
+        configureRxJavaErrorHandler();
+
         // If a crash log exists, show DebugActivity FIRST
         showDebugActivityIfCrashLogExists();
 
         performInitialization();
+    }
+
+    private void configureRxJavaErrorHandler() {
+        // https://github.com/ReactiveX/RxJava/wiki/What's-different-in-2.0#error-handling
+        RxJavaPlugins.setErrorHandler(
+                new Consumer<Throwable>() {
+                    @Override
+                    public void accept(@NonNull final Throwable throwable) {
+                        Log.e(
+                                TAG,
+                                "RxJavaPlugins.ErrorHandler called with -> : "
+                                        + "throwable = ["
+                                        + throwable.getClass().getName()
+                                        + "]");
+
+                        final Throwable actualThrowable;
+                        if (throwable instanceof UndeliverableException) {
+                            // As UndeliverableException is a wrapper,
+                            // get the cause of it to get the "real" exception
+                            actualThrowable = Objects.requireNonNull(throwable.getCause());
+                        } else {
+                            actualThrowable = throwable;
+                        }
+
+                        final List<Throwable> errors;
+                        if (actualThrowable instanceof CompositeException) {
+                            errors = ((CompositeException) actualThrowable).getExceptions();
+                        } else {
+                            errors = Collections.singletonList(actualThrowable);
+                        }
+
+                        for (final Throwable error : errors) {
+                            if (isThrowableIgnored(error)) {
+                                return;
+                            }
+                            if (isThrowableCritical(error)) {
+                                reportException(error);
+                                return;
+                            }
+                        }
+
+                        // Out-of-lifecycle exceptions should only be reported if a debug user
+                        // wishes so,
+                        // When exception is not reported, log it
+                        if (isDisposedRxExceptionsReported()) {
+                            reportException(actualThrowable);
+                        } else {
+                            Log.e(
+                                    TAG,
+                                    "RxJavaPlugin: Undeliverable Exception received: ",
+                                    actualThrowable);
+                        }
+                    }
+
+                    private boolean isThrowableIgnored(@NonNull final Throwable throwable) {
+                        // Don't crash the application over a simple network problem
+                        // Calling our local helper method instead of the one from the library
+                        return hasAssignableCause(
+                                throwable,
+                                // network api cancellation
+                                IOException.class,
+                                SocketException.class,
+                                // blocking code disposed
+                                InterruptedException.class,
+                                InterruptedIOException.class);
+                    }
+
+                    private boolean isThrowableCritical(@NonNull final Throwable throwable) {
+                        // Though these exceptions cannot be ignored
+                        // Calling our local helper method instead of the one from the library
+                        return hasAssignableCause(
+                                throwable,
+                                NullPointerException.class,
+                                IllegalArgumentException.class, // bug in app
+                                OnErrorNotImplementedException.class,
+                                MissingBackpressureException.class,
+                                IllegalStateException.class); // bug in operator
+                    }
+
+                    private void reportException(@NonNull final Throwable throwable) {
+                        // Throw uncaught exception that will trigger the report system
+                        final Thread currentThread = Thread.currentThread();
+                        final UncaughtExceptionHandler handler = currentThread.getUncaughtExceptionHandler();
+                        if (handler != null) {
+                            handler.uncaughtException(currentThread, throwable);
+                        }
+                    }
+                });
+    }
+
+    /**
+     * This is our local implementation of the method that was causing issues,
+     * making our code independent of the external library's version.
+     */
+    private boolean hasAssignableCause(@Nullable final Throwable throwable,
+                                       @NonNull final Class<?>... causeTypes) {
+        if (throwable == null) {
+            return false;
+        }
+
+        for (final Class<?> causeType : causeTypes) {
+            if (causeType.isAssignableFrom(throwable.getClass())) {
+                return true;
+            }
+        }
+
+        return hasAssignableCause(throwable.getCause(), causeTypes);
+    }
+
+    private boolean isDisposedRxExceptionsReported() {
+        return getDefaultSharedPreferences().getBoolean(
+                getString(R.string.report_disposed_rx_exceptions_key), false);
     }
 
     /**
@@ -439,7 +579,7 @@ public class App extends Application {
                 }
         }
     }
-    
+
     public static Context getAppContext(){
         return getInstance().getApplicationContext();
     }
