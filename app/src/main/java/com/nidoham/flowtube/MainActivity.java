@@ -3,295 +3,161 @@ package com.nidoham.flowtube;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
-import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
-import androidx.viewpager2.adapter.FragmentStateAdapter;
-import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.color.DynamicColors;
 import com.nidoham.flowtube.databinding.ActivityMainBinding;
-import com.nidoham.flowtube.fragment.HomeFragment;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.nidoham.opentube.fragments.BaseStateFragment;
+import com.nidoham.opentube.fragments.list.*;
 
 /**
  * MainActivity for FlowTube.
- * - Handles navigation safety, crash protection, and fragment lifecycle.
+ * Handles app initialization, navigation, and search.
  */
 public class MainActivity extends AppCompatActivity {
 
     private ActivityMainBinding binding;
-    private ViewPager2 viewPager;
     private BottomNavigationView bottomNav;
-    private List<Fragment> fragments;
+    private int currentNavigationId = R.id.nav_home;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        try {
-            binding = ActivityMainBinding.inflate(getLayoutInflater());
-            View view = binding.getRoot();
-            setContentView(view);
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
-            int seedColor = safeGetColor(R.color.seed);
+        int seedColor = ContextCompat.getColor(this, R.color.seed);
+        setSystemBarColors(seedColor);
 
-            // Set status/navigation bar color safely
-            setSystemBarColors(seedColor);
+        bottomNav = binding.bottomNav;
 
-            // Initialize views
-            viewPager = binding.contentPage;
-            bottomNav = binding.bottomNav;
-            viewPager.setUserInputEnabled(false);
+        setupSearchButton();
+        setupBottomNavigation();
+        applyDynamicColors();
 
-            // Setup fragments and navigation
-            setupFragments();
-            setupOnClickListener();
-
-            ViewPagerAdapter adapter = new ViewPagerAdapter(this, fragments);
-            viewPager.setAdapter(adapter);
-
-            setupBottomNavigation();
-
-            applyDynamicColors(seedColor);
-
-        } catch (Throwable t) {
-            Log.e("MainActivity", "Critical error in onCreate", t);
-            showFatalErrorAndExit(t);
+        // Load initial fragment only if first launch
+        if (savedInstanceState == null) {
+            loadNavigationItem(R.id.nav_home);
         }
     }
 
     /**
-     * Set status bar and navigation bar colors, safely.
+     * Setup search button click.
      */
-    private void setSystemBarColors(int color) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                getWindow().setStatusBarColor(color);
-                getWindow().setNavigationBarColor(color);
-            }
-        } catch (Exception e) {
-            Log.w("MainActivity", "Failed to set system bar colors", e);
-        }
+    private void setupSearchButton() {
+        binding.searchBtn.setOnClickListener(v -> {
+            startActivity(new Intent(this, SearchActivity.class));
+        });
     }
 
     /**
-     * Get color resource safely.
-     */
-    private int safeGetColor(int colorResId) {
-        try {
-            return ContextCompat.getColor(this, colorResId);
-        } catch (Exception e) {
-            Log.w("MainActivity", "Failed to get color, defaulting to black", e);
-            return 0xFF000000;
-        }
-    }
-
-    /**
-     * Setup search button click with protection.
-     */
-    private void setupOnClickListener() {
-        try {
-            binding.searchBtn.setOnClickListener(v -> {
-                try {
-                    startActivity(new Intent(getApplicationContext(), SearchActivity.class));
-                } catch (Exception e) {
-                    Log.e("MainActivity", "Failed to open SearchActivity", e);
-                    showToast("Search unavailable");
-                }
-            });
-        } catch (Exception e) {
-            Log.w("MainActivity", "Search button setup failed", e);
-        }
-    }
-
-    /**
-     * Setup fragments safely.
-     */
-    private void setupFragments() {
-        fragments = new ArrayList<>();
-        try {
-            fragments.add(new HomeFragment());
-            fragments.add(new CommunityFragment());
-            fragments.add(new LibraryFragment());
-            fragments.add(new SubscriptionFragment());
-        } catch (Exception e) {
-            Log.e("MainActivity", "Error creating fragments", e);
-            showToast("Some tabs could not load.");
-        }
-    }
-
-    /**
-     * Setup BottomNavigationView with safety.
+     * Setup bottom navigation listener.
      */
     private void setupBottomNavigation() {
-        try {
-            bottomNav.setOnItemSelectedListener(item -> {
-                try {
-                    int itemId = item.getItemId();
-                    if (itemId == R.id.nav_home) {
-                        viewPager.setCurrentItem(0, false);
-                        return true;
-                    } else if (itemId == R.id.nav_community) {
-                        viewPager.setCurrentItem(1, false);
-                        return true;
-                    } else if (itemId == R.id.nav_library) {
-                        viewPager.setCurrentItem(2, false);
-                        return true;
-                    } else if (itemId == R.id.nav_subscription) {
-                        viewPager.setCurrentItem(3, false);
-                        return true;
-                    }
-                } catch (Exception e) {
-                    Log.e("MainActivity", "Navigation error", e);
-                    showToast("Navigation failed.");
-                }
-                return false;
-            });
-
-            // Sync ViewPager with BottomNavigationView
-            viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-                @Override
-                public void onPageSelected(int position) {
-                    super.onPageSelected(position);
-                    try {
-                        // Prevent infinite loop by removing and re-adding listener
-                        bottomNav.setOnItemSelectedListener(null);
-                        bottomNav.getMenu().getItem(position).setChecked(true);
-                        // Restore listener
-                        bottomNav.setOnItemSelectedListener(item -> {
-                            try {
-                                int itemId = item.getItemId();
-                                if (itemId == R.id.nav_home) {
-                                    viewPager.setCurrentItem(0, false);
-                                    return true;
-                                } else if (itemId == R.id.nav_community) {
-                                    viewPager.setCurrentItem(1, false);
-                                    return true;
-                                } else if (itemId == R.id.nav_library) {
-                                    viewPager.setCurrentItem(2, false);
-                                    return true;
-                                } else if (itemId == R.id.nav_subscription) {
-                                    viewPager.setCurrentItem(3, false);
-                                    return true;
-                                }
-                            } catch (Exception e) {
-                                Log.e("MainActivity", "BottomNav error", e);
-                                showToast("Navigation failed.");
-                            }
-                            return false;
-                        });
-                    } catch (Exception e) {
-                        Log.e("MainActivity", "Failed to update BottomNav", e);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            Log.e("MainActivity", "BottomNavigation setup failed", e);
-        }
-    }
-
-    /**
-     * Apply Material You dynamic colors if available, safely.
-     */
-    private void applyDynamicColors(int seedColor) {
-        try {
-            DynamicColors.applyIfAvailable(this);
-            setSystemBarColors(seedColor);
-        } catch (Exception e) {
-            Log.w("MainActivity", "DynamicColors apply failed", e);
-        }
-    }
-
-    /**
-     * Show a toast message safely.
-     */
-    private void showToast(String msg) {
-        try {
-            android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.w("MainActivity", "Toast failed", e);
-        }
-    }
-
-    /**
-     * Show fatal error and finish activity.
-     */
-    private void showFatalErrorAndExit(Throwable t) {
-        try {
-            showToast("Critical error! App will close.");
-        } catch (Exception ignored) {}
-        finish();
-    }
-
-    /**
-     * ViewPager2 Adapter with protection.
-     */
-    private static class ViewPagerAdapter extends FragmentStateAdapter {
-        private final List<Fragment> fragments;
-
-        public ViewPagerAdapter(@NonNull FragmentActivity fa, @NonNull List<Fragment> fragments) {
-            super(fa);
-            this.fragments = fragments;
-        }
-
-        @NonNull
-        @Override
-        public Fragment createFragment(int position) {
-            try {
-                return fragments.get(position);
-            } catch (Exception e) {
-                Log.e("MainActivity", "Fragment create failed for position " + position, e);
-                // Return a blank fragment to avoid crash
-                return new Fragment();
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId != currentNavigationId) { // Prevent reloading same fragment
+                currentNavigationId = itemId;
+                loadNavigationItem(itemId);
             }
-        }
+            return true;
+        });
+    }
 
-        @Override
-        public int getItemCount() {
-            return fragments != null ? fragments.size() : 0;
+    /**
+     * Load fragment based on navigation ID.
+     */
+    private void loadNavigationItem(int navigationId) {
+        switch (navigationId) {
+            case R.id.nav_home:
+                BaseStateFragment.loadFragment(getSupportFragmentManager(), new HomeFragment(), false, "home");
+                break;
+            case R.id.nav_community:
+                BaseStateFragment.loadFragment(getSupportFragmentManager(), new CommunityFragment(), false, "community");
+                break;
+            case R.id.nav_library:
+                BaseStateFragment.loadFragment(getSupportFragmentManager(), new LibraryFragment(), false, "library");
+                break;
+            case R.id.nav_subscription:
+                BaseStateFragment.loadFragment(getSupportFragmentManager(), new SubscriptionFragment(), false, "subscription");
+                break;
+            default:
+                BaseStateFragment.loadFragment(getSupportFragmentManager(), new HomeFragment(), false, "home");
+                break;
         }
     }
 
     /**
-     * Back navigation safety:
-     * - If not on home, always return to home.
-     * - If already home, allow default back.
+     * Set system bar colors.
+     */
+    private void setSystemBarColors(int color) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(color);
+            getWindow().setNavigationBarColor(color);
+        }
+    }
+
+    /**
+     * Apply Material You dynamic colors (Android 12+).
+     */
+    private void applyDynamicColors() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            DynamicColors.applyIfAvailable(this);
+        }
+    }
+
+    /**
+     * Handle back navigation with home-first behavior.
      */
     @Override
     public void onBackPressed() {
-        try {
-            if (viewPager != null && viewPager.getCurrentItem() != 0) {
-                viewPager.setCurrentItem(0, false);
-                if (bottomNav != null)
-                    bottomNav.setSelectedItemId(R.id.nav_home);
-            } else {
-                super.onBackPressed();
-            }
-        } catch (Exception e) {
-            Log.e("MainActivity", "Back navigation error", e);
-            super.onBackPressed();
-        }
+        finishAffinity();
+        super.onBackPressed();
+    }
+
+    /**
+     * Check if current navigation is Home.
+     */
+    public boolean isOnHomeNavigation() {
+        return currentNavigationId == R.id.nav_home;
+    }
+
+    /**
+     * Navigate to Home tab.
+     */
+    public void navigateToHome() {
+        bottomNav.setSelectedItemId(R.id.nav_home);
+    }
+
+    /**
+     * Save current navigation ID on config change.
+     */
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt("current_navigation_id", currentNavigationId);
+    }
+
+    /**
+     * Restore current navigation ID after config change.
+     */
+    @Override
+    protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        currentNavigationId = savedInstanceState.getInt("current_navigation_id", R.id.nav_home);
+        bottomNav.setSelectedItemId(currentNavigationId);
     }
 
     @Override
     protected void onDestroy() {
-        try {
-            // Cleanup listeners to avoid leaks
-            if (viewPager != null)
-                viewPager.setAdapter(null);
-            if (bottomNav != null)
-                bottomNav.setOnItemSelectedListener(null);
-        } catch (Exception e) {
-            Log.w("MainActivity", "onDestroy cleanup failed", e);
+        if (bottomNav != null) {
+            bottomNav.setOnItemSelectedListener(null);
         }
         super.onDestroy();
     }
