@@ -39,6 +39,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private static final int CONTROLS_HIDE_DELAY_MS = 3000;
     private static final int SEEK_INCREMENT_MS = 10000;
+    private static final int INITIAL_BUFFERING_DELAY_MS = 1000;
 
     private ActivityPlayerBinding binding;
     private PlayerViewModel playerViewModel;
@@ -51,6 +52,9 @@ public class PlayerActivity extends AppCompatActivity {
     private String channelName = "";
     private long playbackPosition = 0L;
     private boolean isFullscreen = false;
+
+    // Flag to ensure initial buffering delay only once
+    private boolean initialBufferingHandled = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -105,9 +109,24 @@ public class PlayerActivity extends AppCompatActivity {
             @Override
             public void onPlaybackStateChanged(int state) {
                 updateProgress();
+
                 if (state == Player.STATE_BUFFERING) {
-                    showLoading(true);
+                    if (!initialBufferingHandled) {
+                        // Initial buffering - pause playback and delay start
+                        initialBufferingHandled = true;
+                        playerViewModel.pause();
+                        mainHandler.postDelayed(() -> {
+                            if (player.getPlaybackState() == Player.STATE_BUFFERING) {
+                                playerViewModel.play();
+                            }
+                        }, INITIAL_BUFFERING_DELAY_MS);
+                    } else {
+                        showLoading(true);
+                    }
+                } else if (state == Player.STATE_READY) {
+                    showLoading(false);
                 } else {
+                    // For other states like ENDED or IDLE
                     showLoading(false);
                 }
             }
@@ -172,6 +191,7 @@ public class PlayerActivity extends AppCompatActivity {
             seekToPosition();
             showLoading(false);
             showControlsTemporarily();
+            initialBufferingHandled = false; // reset flag on new video load
         } catch (Exception e) {
             showError("Failed to load streams: " + e.getMessage());
         }
@@ -183,6 +203,7 @@ public class PlayerActivity extends AppCompatActivity {
             seekToPosition();
             showLoading(false);
             showControlsTemporarily();
+            initialBufferingHandled = false; // reset flag on new video load
         } catch (Exception e) {
             showError("Failed to load video: " + e.getMessage());
         }
@@ -438,8 +459,8 @@ public class PlayerActivity extends AppCompatActivity {
         if (url == null || url.trim().isEmpty()) return false;
         String normalizedUrl = url.trim().toLowerCase();
         return normalizedUrl.contains("youtube.com/watch") ||
-                normalizedUrl.contains("youtu.be/") ||
-                normalizedUrl.contains("youtube.com/embed/");
+            normalizedUrl.contains("youtu.be/") ||
+            normalizedUrl.contains("youtube.com/embed/");
     }
 
     @Override
