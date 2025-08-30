@@ -1,5 +1,8 @@
 package com.nidoham.flowtube;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
@@ -12,6 +15,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
@@ -40,18 +44,22 @@ public class PlayerActivity extends AppCompatActivity {
     private static final int CONTROLS_HIDE_DELAY_MS = 3000;
     private static final int SEEK_INCREMENT_MS = 10000;
     private static final int INITIAL_BUFFERING_DELAY_MS = 1000;
+    private static final int ANIMATION_DURATION_MS = 300;
 
     private ActivityPlayerBinding binding;
     private PlayerViewModel playerViewModel;
     private StreamExtractor streamExtractor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
+    private Runnable progressUpdateRunnable;
 
     private String videoUrl = "";
     private String videoTitle = "";
     private String channelName = "";
     private long playbackPosition = 0L;
     private boolean isFullscreen = false;
+    private boolean areControlsVisible = true;
+    private boolean isUserSeeking = false;
 
     // Flag to ensure initial buffering delay only once
     private boolean initialBufferingHandled = false;
@@ -224,6 +232,11 @@ public class PlayerActivity extends AppCompatActivity {
         setupSeekBar();
         setupTouchHandling();
         startProgressUpdates();
+        
+        // Initialize controls visibility
+        binding.controlsOverlay.setAlpha(1.0f);
+        binding.controlsOverlay.setVisibility(View.VISIBLE);
+        showControlsTemporarily();
     }
 
     private void updateVideoInfo() {
@@ -241,21 +254,82 @@ public class PlayerActivity extends AppCompatActivity {
 
         binding.btnPlayPause.setOnClickListener(v -> {
             if (player != null) {
+                animateButtonPress(v);
                 playerViewModel.togglePlayPause();
                 showControlsTemporarily();
             }
         });
 
         binding.btnReplay10.setOnClickListener(v -> {
+            animateButtonPress(v);
             seekRelative(-SEEK_INCREMENT_MS);
             showControlsTemporarily();
         });
+        
         binding.btnForward10.setOnClickListener(v -> {
+            animateButtonPress(v);
             seekRelative(SEEK_INCREMENT_MS);
             showControlsTemporarily();
         });
-        binding.btnOrientation.setOnClickListener(v -> toggleOrientation());
-        binding.btnBack.setOnClickListener(v -> finish());
+        
+        binding.btnOrientation.setOnClickListener(v -> {
+            animateButtonPress(v);
+            toggleOrientation();
+        });
+        
+        binding.btnBack.setOnClickListener(v -> {
+            animateButtonPress(v);
+            finish();
+        });
+
+        // Setup other control buttons with animations
+        setupControlButton(binding.btnCast);
+        setupControlButton(binding.btnCC);
+        setupControlButton(binding.btnSettings);
+        setupControlButton(binding.btnLike);
+        setupControlButton(binding.btnDislike);
+        setupControlButton(binding.btnComments);
+        setupControlButton(binding.btnSave);
+        setupControlButton(binding.btnShare);
+        setupControlButton(binding.btnMore);
+    }
+
+    private void setupControlButton(View button) {
+        if (button != null) {
+            button.setOnClickListener(v -> {
+                animateButtonPress(v);
+                showControlsTemporarily();
+            });
+        }
+    }
+
+    private void animateButtonPress(View button) {
+        ObjectAnimator scaleDown = ObjectAnimator.ofFloat(button, "scaleX", 1.0f, 0.9f);
+        scaleDown.setDuration(100);
+        scaleDown.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        ObjectAnimator scaleUp = ObjectAnimator.ofFloat(button, "scaleX", 0.9f, 1.0f);
+        scaleUp.setDuration(100);
+        scaleUp.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        ObjectAnimator scaleDownY = ObjectAnimator.ofFloat(button, "scaleY", 1.0f, 0.9f);
+        scaleDownY.setDuration(100);
+        scaleDownY.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        ObjectAnimator scaleUpY = ObjectAnimator.ofFloat(button, "scaleY", 0.9f, 1.0f);
+        scaleUpY.setDuration(100);
+        scaleUpY.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        scaleDown.start();
+        scaleDownY.start();
+
+        scaleDown.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                scaleUp.start();
+                scaleUpY.start();
+            }
+        });
     }
 
     private void seekRelative(long deltaMs) {
@@ -293,6 +367,7 @@ public class PlayerActivity extends AppCompatActivity {
                 ExoPlayer player = playerViewModel.getExoPlayer();
                 wasPlaying = player != null && player.isPlaying();
                 if (wasPlaying) playerViewModel.pause();
+                isUserSeeking = true;
                 showControlsTemporarily();
             }
 
@@ -307,6 +382,7 @@ public class PlayerActivity extends AppCompatActivity {
                     }
                 }
                 if (wasPlaying) playerViewModel.play();
+                isUserSeeking = false;
                 showControlsTemporarily();
             }
 
@@ -338,24 +414,54 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void toggleControlsVisibility() {
-        boolean isVisible = binding.controlsOverlay.getVisibility() == View.VISIBLE;
-        if (isVisible) {
-            binding.controlsOverlay.setVisibility(View.INVISIBLE);
-            cancelHideTimer();
+        if (areControlsVisible) {
+            hideControlsWithAnimation();
         } else {
-            binding.controlsOverlay.setVisibility(View.VISIBLE);
-            startHideTimer();
+            showControlsWithAnimation();
         }
     }
 
-    private void showControlsTemporarily() {
+    private void showControlsWithAnimation() {
+        if (areControlsVisible) return;
+
+        areControlsVisible = true;
         binding.controlsOverlay.setVisibility(View.VISIBLE);
+        
+        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(binding.controlsOverlay, "alpha", 0.0f, 1.0f);
+        fadeIn.setDuration(ANIMATION_DURATION_MS);
+        fadeIn.setInterpolator(new AccelerateDecelerateInterpolator());
+        fadeIn.start();
+        
         startHideTimer();
+    }
+
+    private void hideControlsWithAnimation() {
+        if (!areControlsVisible) return;
+
+        areControlsVisible = false;
+        
+        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(binding.controlsOverlay, "alpha", 1.0f, 0.0f);
+        fadeOut.setDuration(ANIMATION_DURATION_MS);
+        fadeOut.setInterpolator(new AccelerateDecelerateInterpolator());
+        
+        fadeOut.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                binding.controlsOverlay.setVisibility(View.INVISIBLE);
+            }
+        });
+        
+        fadeOut.start();
+        cancelHideTimer();
+    }
+
+    private void showControlsTemporarily() {
+        showControlsWithAnimation();
     }
 
     private void startHideTimer() {
         cancelHideTimer();
-        hideControlsRunnable = () -> binding.controlsOverlay.setVisibility(View.INVISIBLE);
+        hideControlsRunnable = this::hideControlsWithAnimation;
         mainHandler.postDelayed(hideControlsRunnable, CONTROLS_HIDE_DELAY_MS);
     }
 
@@ -366,14 +472,22 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void startProgressUpdates() {
-        Runnable updateRunnable = new Runnable() {
+        progressUpdateRunnable = new Runnable() {
             @Override
             public void run() {
-                updateProgress();
+                if (!isUserSeeking) {
+                    updateProgress();
+                }
                 mainHandler.postDelayed(this, 500);
             }
         };
-        mainHandler.post(updateRunnable);
+        mainHandler.post(progressUpdateRunnable);
+    }
+
+    private void stopProgressUpdates() {
+        if (progressUpdateRunnable != null) {
+            mainHandler.removeCallbacks(progressUpdateRunnable);
+        }
     }
 
     private void updateProgress() {
@@ -382,12 +496,14 @@ public class PlayerActivity extends AppCompatActivity {
 
         long position = player.getCurrentPosition();
         long duration = player.getDuration();
+        long bufferedPosition = player.getBufferedPosition();
 
-        if (duration > 0) {
+        if (duration > 0 && !isUserSeeking) {
             int progress = (int) ((position * 1000) / duration);
+            int bufferedProgress = (int) ((bufferedPosition * 1000) / duration);
+            
             binding.videoProgress.setProgress(progress);
-        } else {
-            binding.videoProgress.setProgress(0);
+            binding.videoProgress.setSecondaryProgress(bufferedProgress);
         }
 
         binding.txtCurrentTime.setText(formatTime(position));
@@ -395,8 +511,14 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void updatePlayPauseButton(boolean isPlaying) {
-        int iconRes = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
+        int iconRes = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play_arrow;
         binding.btnPlayPause.setImageResource(iconRes);
+        
+        // Add rotation animation for visual feedback
+        ObjectAnimator rotateAnimation = ObjectAnimator.ofFloat(binding.btnPlayPause, "rotation", 0f, 360f);
+        rotateAnimation.setDuration(200);
+        rotateAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
+        rotateAnimation.start();
     }
 
     private String formatTime(long millis) {
@@ -445,7 +567,22 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void showLoading(boolean show) {
         if (binding.loadingIndicator != null) {
-            binding.loadingIndicator.setVisibility(show ? View.VISIBLE : View.GONE);
+            if (show) {
+                binding.loadingIndicator.setVisibility(View.VISIBLE);
+                ObjectAnimator fadeIn = ObjectAnimator.ofFloat(binding.loadingIndicator, "alpha", 0.0f, 1.0f);
+                fadeIn.setDuration(200);
+                fadeIn.start();
+            } else {
+                ObjectAnimator fadeOut = ObjectAnimator.ofFloat(binding.loadingIndicator, "alpha", 1.0f, 0.0f);
+                fadeOut.setDuration(200);
+                fadeOut.addListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        binding.loadingIndicator.setVisibility(View.GONE);
+                    }
+                });
+                fadeOut.start();
+            }
         }
     }
 
@@ -469,6 +606,15 @@ public class PlayerActivity extends AppCompatActivity {
         if (playerViewModel != null) {
             playerViewModel.pause();
         }
+        cancelHideTimer();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (areControlsVisible) {
+            startHideTimer();
+        }
     }
 
     @Override
@@ -477,12 +623,14 @@ public class PlayerActivity extends AppCompatActivity {
         if (playerViewModel != null) {
             playerViewModel.pause();
         }
+        stopProgressUpdates();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         cancelHideTimer();
+        stopProgressUpdates();
         if (streamExtractor != null) {
             streamExtractor.cleanup();
         }

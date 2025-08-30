@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Background (total duration) -->
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="2dp" />
+            <solid android:color="#4D4D4D"/> <!-- YouTube-style dark grey background -->
+        </shape>
+    </item>
+
+    <!-- Secondary Progress (buffered) -->
+    <item android:id="@android:id/secondaryProgress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="2dp" />
+                <solid android:color="#CCCCCC"/> <!-- Light grey for buffered content -->
+            </shape>
+        </clip>
+    </item>
+
+    <!-- Primary Progress (played time) -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="2dp" />
+                <solid android:color="#FF0000"/> <!-- YouTube red for progress -->
+            </shape>
+        </clip>
+    </item>
+</layer-list>

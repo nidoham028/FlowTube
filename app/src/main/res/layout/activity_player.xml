@@ -202,14 +202,15 @@
     <SeekBar
          android:layout_height="wrap_content"
          android:layout_width="0dp"
+         android:thumb="@drawable/custom_thumb"
+         android:max="1000"
          android:layout_marginHorizontal="16dp"
          app:layout_constraintStart_toStartOf="parent"
-         android:thumbTint="@android:color/holo_red_dark"
          app:layout_constraintEnd_toEndOf="parent"
-         android:progressTint="@android:color/holo_red_dark"
          style="?android:attr/progressBarStyleHorizontal"
          android:layout_marginTop="12dp"
          app:layout_constraintTop_toBottomOf="@id/playerView"
+         android:progressDrawable="@drawable/custom_seekbar"
          android:id="@+id/videoProgress" />
 
     <androidx.core.widget.NestedScrollView
@@ -254,7 +255,7 @@
                      android:layout_height="wrap_content"
                      android:layout_width="wrap_content"
                      android:textSize="12sp"
-                     android:textColor="@android:color/darker_gray"
+                     android:textColor="#B3B3B3"
                      android:layout_marginTop="8dp"
                      android:id="@+id/txtMeta"
                      android:text="1,234,567 views • 2 days ago" />
@@ -268,10 +269,12 @@
                  android:paddingHorizontal="16dp"
                  android:id="@+id/channelInfoContainer">
 
-                <de.hdodenhof.circleimageview.CircleImageView
+                <ImageView
                      android:layout_height="48dp"
                      android:layout_width="48dp"
                      android:src="@drawable/ic_avatar_placeholder"
+                     
+                     android:scaleType="centerCrop"
                      app:layout_constraintTop_toTopOf="parent"
                      app:layout_constraintStart_toStartOf="parent"
                      app:layout_constraintBottom_toBottomOf="parent"
@@ -297,7 +300,7 @@
                      app:layout_constraintStart_toStartOf="@id/txtChannelName"
                      android:textSize="11sp"
                      app:layout_constraintEnd_toEndOf="@id/txtChannelName"
-                     android:textColor="@android:color/darker_gray"
+                     android:textColor="#B3B3B3"
                      app:layout_constraintBottom_toBottomOf="@id/imgChannelAvatar"
                      app:layout_constraintTop_toBottomOf="@id/txtChannelName"
                      android:id="@+id/txtSubscriberCount"

@@ -1,20 +1,50 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/FlowTube/app/src/main/java/com/nidoham/flowtube/SplashActivity.java",
+      "file": "/storage/emulated/0/AndroidIDEProjects/FlowTube/app/src/main/java/com/nidoham/flowtube/PlayerActivity.java",
       "selection": {
         "end": {
-          "column": 56,
-          "index": 1092,
-          "line": 28
+          "column": 29,
+          "index": 23155,
+          "line": 647
         },
         "start": {
-          "column": 56,
-          "index": 1092,
-          "line": 28
+          "column": 29,
+          "index": 23155,
+          "line": 647
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/FlowTube/app/src/main/res/layout/activity_player.xml",
+      "selection": {
+        "end": {
+          "column": 50,
+          "index": 9964,
+          "line": 220
+        },
+        "start": {
+          "column": 50,
+          "index": 9964,
+          "line": 220
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/FlowTube/app/src/main/res/layout-land/activity_player.xml",
+      "selection": {
+        "end": {
+          "column": 39,
+          "index": 9153,
+          "line": 201
+        },
+        "start": {
+          "column": 39,
+          "index": 9153,
+          "line": 201
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/FlowTube/app/src/main/java/com/nidoham/flowtube/SplashActivity.java"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/FlowTube/app/src/main/res/layout/activity_player.xml"
 }

@@ -33,7 +33,6 @@ ext {
     groupieVersion = "2.10.1"
     markwonVersion = "4.6.2"
     acraVersion = "5.11.3"
-    leakCanaryVersion = "2.12"
     
     // Testing versions
     junitVersion = "4.13.2"

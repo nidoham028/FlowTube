@@ -76,7 +76,7 @@
                  android:ellipsize="end"
                  app:layout_constraintStart_toStartOf="@id/txtTitle"
                  android:textSize="11sp"
-                 android:textColor="@android:color/darker_gray"
+                 android:textColor="#B3B3B3"
                  app:layout_constraintEnd_toEndOf="@id/txtTitle"
                  app:layout_constraintBottom_toBottomOf="parent"
                  app:layout_constraintTop_toBottomOf="@id/txtTitle"
@@ -201,14 +201,15 @@
             <SeekBar
                  android:layout_height="wrap_content"
                  android:layout_width="0dp"
+                 android:thumb="@drawable/custom_thumb"
+                 android:max="1000"
                  app:layout_constraintTop_toTopOf="@id/txtCurrentTime"
                  android:layout_marginHorizontal="8dp"
-                 android:thumbTint="@android:color/holo_red_dark"
                  app:layout_constraintStart_toEndOf="@id/txtCurrentTime"
                  app:layout_constraintEnd_toStartOf="@id/txtTotalTime"
-                 android:progressTint="@android:color/holo_red_dark"
                  style="?android:attr/progressBarStyleHorizontal"
                  app:layout_constraintBottom_toBottomOf="@id/txtCurrentTime"
+                 android:progressDrawable="@drawable/custom_seekbar"
                  android:id="@+id/videoProgress" />
 
             <TextView
@@ -253,6 +254,8 @@
                          android:padding="4dp"
                          android:paddingHorizontal="12dp"
                          android:minWidth="0dp"
+                         app:tint="@android:color/white"
+                         android:contentDescription="@string/like_button"
                          android:id="@+id/btnLike" />
 
                     <ImageButton
@@ -264,6 +267,8 @@
                          android:padding="4dp"
                          android:paddingHorizontal="12dp"
                          android:minWidth="0dp"
+                         app:tint="@android:color/white"
+                         android:contentDescription="@string/dislike_button"
                          android:id="@+id/btnDislike" />
 
                     <ImageButton
@@ -275,6 +280,8 @@
                          android:padding="4dp"
                          android:paddingHorizontal="12dp"
                          android:minWidth="0dp"
+                         app:tint="@android:color/white"
+                         android:contentDescription="@string/comment_button"
                          android:id="@+id/btnComments" />
 
                     <ImageButton
@@ -286,6 +293,8 @@
                          android:padding="4dp"
                          android:paddingHorizontal="12dp"
                          android:minWidth="0dp"
+                         app:tint="@android:color/white"
+                         android:contentDescription="@string/save_button"
                          android:id="@+id/btnSave" />
 
                     <ImageButton
@@ -297,6 +306,8 @@
                          android:padding="4dp"
                          android:paddingHorizontal="12dp"
                          android:minWidth="0dp"
+                         app:tint="@android:color/white"
+                         android:contentDescription="@string/share_button"
                          android:id="@+id/btnShare" />
 
                     <ImageButton
@@ -307,6 +318,8 @@
                          android:padding="4dp"
                          android:paddingHorizontal="12dp"
                          android:minWidth="0dp"
+                         app:tint="@android:color/white"
+                         android:contentDescription="@string/more_options"
                          android:id="@+id/btnMore" />
 
                 </LinearLayout>

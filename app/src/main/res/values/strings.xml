@@ -25,5 +25,12 @@
     <string name="orientation_toggle" translatable="false">Rotate Screen</string>
     <string name="channel_avatar" translatable="false">Channel Avatar</string>
     <string name="expand_comments" translatable="false">Expand Comments</string>
+    
+    <string name="like_button">Like</string>
+    <string name="dislike_button">Dislike</string>
+    <string name="comment_button">Comment</string>
+    <string name="save_button">Save</string>
+    <string name="share_button">Share</string>
+    <string name="more_options">More</string>
 
 </resources>
