@@ -12,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
+import com.nidoham.flowtube.stream.prefs.PrefsHelper;  // PrefsHelper Import যোগ হয়েছে
 import com.nidoham.strivo.settings.ApplicationSettings;
 import com.nidoham.flowtube.core.language.AppLanguage;
 
@@ -64,6 +65,10 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         instance = this;
+
+        // PrefsHelper এর জন্য SharedPreferences ইনিশিয়ালাইজ করুন
+        PrefsHelper.initialize(this);
+
         ACRA.init(this);
 
         // Store the default exception handler before setting our custom one
@@ -89,7 +94,6 @@ public class App extends Application {
     }
 
     private void configureRxJavaErrorHandler() {
-        // https://github.com/ReactiveX/RxJava/wiki/What's-different-in-2.0#error-handling
         RxJavaPlugins.setErrorHandler(
                 new Consumer<Throwable>() {
                     @Override
@@ -103,8 +107,6 @@ public class App extends Application {
 
                         final Throwable actualThrowable;
                         if (throwable instanceof UndeliverableException) {
-                            // As UndeliverableException is a wrapper,
-                            // get the cause of it to get the "real" exception
                             actualThrowable = Objects.requireNonNull(throwable.getCause());
                         } else {
                             actualThrowable = throwable;
@@ -127,9 +129,6 @@ public class App extends Application {
                             }
                         }
 
-                        // Out-of-lifecycle exceptions should only be reported if a debug user
-                        // wishes so,
-                        // When exception is not reported, log it
                         if (isDisposedRxExceptionsReported()) {
                             reportException(actualThrowable);
                         } else {
@@ -141,32 +140,25 @@ public class App extends Application {
                     }
 
                     private boolean isThrowableIgnored(@NonNull final Throwable throwable) {
-                        // Don't crash the application over a simple network problem
-                        // Calling our local helper method instead of the one from the library
                         return hasAssignableCause(
                                 throwable,
-                                // network api cancellation
                                 IOException.class,
                                 SocketException.class,
-                                // blocking code disposed
                                 InterruptedException.class,
                                 InterruptedIOException.class);
                     }
 
                     private boolean isThrowableCritical(@NonNull final Throwable throwable) {
-                        // Though these exceptions cannot be ignored
-                        // Calling our local helper method instead of the one from the library
                         return hasAssignableCause(
                                 throwable,
                                 NullPointerException.class,
-                                IllegalArgumentException.class, // bug in app
+                                IllegalArgumentException.class,
                                 OnErrorNotImplementedException.class,
                                 MissingBackpressureException.class,
-                                IllegalStateException.class); // bug in operator
+                                IllegalStateException.class);
                     }
 
                     private void reportException(@NonNull final Throwable throwable) {
-                        // Throw uncaught exception that will trigger the report system
                         final Thread currentThread = Thread.currentThread();
                         final UncaughtExceptionHandler handler = currentThread.getUncaughtExceptionHandler();
                         if (handler != null) {
@@ -176,10 +168,6 @@ public class App extends Application {
                 });
     }
 
-    /**
-     * This is our local implementation of the method that was causing issues,
-     * making our code independent of the external library's version.
-     */
     private boolean hasAssignableCause(@Nullable final Throwable throwable,
                                        @NonNull final Class<?>... causeTypes) {
         if (throwable == null) {
@@ -200,9 +188,6 @@ public class App extends Application {
                 getString(R.string.report_disposed_rx_exceptions_key), false);
     }
 
-    /**
-     * Show debug activity if a crash log persists from previous launch
-     */
     private void showDebugActivityIfCrashLogExists() {
         SharedPreferences prefs = getDefaultSharedPreferences();
         String crashLog = prefs.getString(CRASH_LOG_KEY, null);
@@ -214,7 +199,6 @@ public class App extends Application {
                     .putExtra("crash_time", prefs.getLong(CRASH_LOG_KEY + "_time", System.currentTimeMillis()))
                     .putExtra("thread_name", Thread.currentThread().getName());
             startActivity(intent);
-            // Optional: clear log after showing
             clearSavedCrashLog(this);
         }
     }
@@ -259,7 +243,6 @@ public class App extends Application {
             applyStoredCookies(downloaderImpl);
             NewPipe.init(downloaderImpl);
 
-            // Clear cache to ensure fresh start
             InfoCache.getInstance().clearCache();
 
             if (DEBUG) {
@@ -275,7 +258,6 @@ public class App extends Application {
     private void applyStoredCookies(@NonNull DownloaderImpl downloader) {
         final SharedPreferences preferences = getDefaultSharedPreferences();
 
-        // Apply reCAPTCHA cookies if available
         try {
             final String cookieKey = getResources().getString(R.string.recaptcha_cookies_key);
             final String storedCookies = preferences.getString(cookieKey, null);
@@ -290,7 +272,6 @@ public class App extends Application {
             Log.w(TAG, "reCAPTCHA cookie resource not available or malformed", e);
         }
 
-        // Apply YouTube restricted mode settings
         try {
             downloader.updateYoutubeRestrictedModeCookies(this);
             if (DEBUG) {
@@ -316,27 +297,20 @@ public class App extends Application {
         final String errorMessage = "Critical application initialization failure";
         Log.e(TAG, errorMessage, e);
 
-        // Save initialization error details
         saveErrorDetails(errorMessage, e);
 
-        // Attempt to launch debug activity
         try {
             launchDebugActivity(errorMessage, e);
         } catch (Exception debugException) {
             Log.e(TAG, "Failed to launch debug activity after initialization failure", debugException);
         }
 
-        // Terminate application gracefully
         terminateApplication();
     }
 
-    /**
-     * Enhanced uncaught exception handler.
-     */
     private void handleUncaughtException(@NonNull Thread thread, @NonNull Throwable throwable) {
         Log.e(TAG, "Uncaught exception in thread: " + thread.getName(), throwable);
 
-        // Check crash frequency to prevent crash loops
         if (shouldPreventCrashLoop()) {
             Log.w(TAG, "Too many crashes detected, delegating to system handler");
             if (defaultExceptionHandler != null) {
@@ -350,7 +324,6 @@ public class App extends Application {
         final String crashDetails = generateCrashReport(throwable, thread);
         saveErrorDetails("Application crash", throwable);
 
-        // Try to launch DebugActivity via main thread handler
         try {
             Intent intent = new Intent(this, DebugActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -368,7 +341,6 @@ public class App extends Application {
                 }
             });
 
-            // Wait *less* time, or let process die after the activity starts
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
@@ -378,7 +350,6 @@ public class App extends Application {
             Log.e(TAG, "Failed to launch DebugActivity after crash", e);
         }
 
-        // Always kill the process (Android requirement)
         android.os.Process.killProcess(android.os.Process.myPid());
         System.exit(10);
     }
@@ -389,7 +360,6 @@ public class App extends Application {
         final long lastCrashTime = preferences.getLong(LAST_CRASH_TIME_KEY, 0);
         final int crashCount = preferences.getInt(CRASH_COUNT_KEY, 0);
 
-        // Reset crash count if enough time has passed
         if (currentTime - lastCrashTime > CRASH_RESET_INTERVAL) {
             preferences.edit()
                     .putInt(CRASH_COUNT_KEY, 0)
@@ -411,9 +381,6 @@ public class App extends Application {
                 .apply();
     }
 
-    /**
-     * Save crash details for later display.
-     */
     private void saveErrorDetails(@NonNull String description, @NonNull Throwable throwable) {
         try {
             final String crashReport = generateCrashReport(throwable, Thread.currentThread());
@@ -474,7 +441,6 @@ public class App extends Application {
 
     private void terminateApplication() {
         try {
-            // Allow brief time for debug activity launch
             Thread.sleep(500);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -556,9 +522,7 @@ public class App extends Application {
             case TRIM_MEMORY_RUNNING_CRITICAL:
                 cache.clearCache();
                 if (downloaderImpl != null) {
-                    // Clear some cookies to free memory if needed
                     downloaderImpl.clearAllCookies();
-                    // Reapply essential cookies
                     applyStoredCookies(downloaderImpl);
                 }
                 if (DEBUG) {
@@ -580,10 +544,10 @@ public class App extends Application {
         }
     }
 
-    public static Context getAppContext(){
+    public static Context getAppContext() {
         return getInstance().getApplicationContext();
     }
-    
+
     @Override
     public void onTerminate() {
         super.onTerminate();

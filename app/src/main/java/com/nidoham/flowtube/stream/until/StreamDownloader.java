@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -29,10 +30,10 @@ import com.nidoham.flowtube.stream.prefs.PrefsHelper;
 public class StreamDownloader {
 
     private static final String TAG = "StreamDownloader";
-    
+
     private final Context context;
     private final Handler mainHandler;
-    
+
     // Specialized downloaders for different stream types
     private final AudioStreamDownloader audioDownloader;
     private final VideoStreamDownloader videoDownloader;
@@ -65,10 +66,10 @@ public class StreamDownloader {
     public interface OnStreamExtractListener {
         void onAudioStreamReady(@NonNull String audioUrl, int bitrate, @NonNull String format);
         void onVideoStreamReady(@NonNull String videoUrl, @NonNull String resolution, @NonNull String format);
-        void onMixedStreamReady(@NonNull String streamUrl, @NonNull String resolution, 
+        void onMixedStreamReady(@NonNull String streamUrl, @NonNull String resolution,
                                @NonNull String format, @NonNull String quality);
         void onError(@NonNull Exception error);
-        
+
         // Optional callbacks for enhanced user experience
         default void onProgress(@NonNull String status) {}
         default void onStreamTypeDetected(@NonNull StreamType streamType) {}
@@ -98,7 +99,7 @@ public class StreamDownloader {
         public final String videoFormat;
         public final String mixedFormat;
 
-        public StreamResult(@NonNull StreamType streamType, @Nullable String audioUrl, 
+        public StreamResult(@NonNull StreamType streamType, @Nullable String audioUrl,
                            @Nullable String videoUrl, @Nullable String mixedUrl,
                            int audioBitrate, @Nullable String videoResolution,
                            @Nullable String audioFormat, @Nullable String videoFormat,
@@ -118,11 +119,88 @@ public class StreamDownloader {
     public StreamDownloader(@NonNull Context context) {
         this.context = context.getApplicationContext();
         this.mainHandler = new Handler(Looper.getMainLooper());
-        
+
         // Initialize specialized downloaders
         this.audioDownloader = new AudioStreamDownloader(context);
         this.videoDownloader = new VideoStreamDownloader(context);
         this.mixedDownloader = new MixedStreamDownloader(context);
+    }
+
+    /**
+     * Convenience method to resolve User Preference quality mode to concrete QualityMode enum
+     */
+    private QualityMode resolveUserPreferenceQualityMode(@NonNull QualityMode qualityMode) {
+        if (qualityMode != QualityMode.USER_PREFERENCE) {
+            return qualityMode;
+        }
+
+        PrefsHelper.StreamModes modes = PrefsHelper.getModes(context);
+
+        if (modes.isLowQuality()) {
+            return QualityMode.DATA_SAVER;
+        } else if (modes.isHighQuality()) {
+            return QualityMode.HIGH_QUALITY;
+        } else {
+            return QualityMode.STANDARD;
+        }
+    }
+
+    /**
+     * Determine effective stream type based on preferences and availability
+     */
+    private StreamType determineEffectiveStreamType(@NonNull StreamType requestedType) {
+        if (requestedType != StreamType.AUTO_DETECT) {
+            return requestedType;
+        }
+
+        PrefsHelper.StreamModes modes = PrefsHelper.getModes(context);
+
+        if (modes.isHighQuality()) {
+            return StreamType.DASH_STREAMS; // High quality users get separate streams for better control
+        } else {
+            return StreamType.MIXED_STREAM; // Default to mixed streams for compatibility
+        }
+    }
+
+    /**
+     * Convert QualityMode to MixedStreamDownloader.QualityPreference
+     */
+    private MixedStreamDownloader.QualityPreference convertQualityMode(@NonNull QualityMode qualityMode) {
+        if (qualityMode == QualityMode.USER_PREFERENCE) {
+            PrefsHelper.StreamModes modes = PrefsHelper.getModes(context);
+            if (modes.isLowQuality()) {
+                return MixedStreamDownloader.QualityPreference.LOW_QUALITY;
+            } else if (modes.isHighQuality()) {
+                return MixedStreamDownloader.QualityPreference.HIGH_QUALITY;
+            } else {
+                return MixedStreamDownloader.QualityPreference.MEDIUM_QUALITY;
+            }
+        }
+
+        switch (qualityMode) {
+            case DATA_SAVER:
+                return MixedStreamDownloader.QualityPreference.LOW_QUALITY;
+            case HIGH_QUALITY:
+                return MixedStreamDownloader.QualityPreference.HIGH_QUALITY;
+            case STANDARD:
+                return MixedStreamDownloader.QualityPreference.MEDIUM_QUALITY;
+            default:
+                return MixedStreamDownloader.QualityPreference.AUTO_QUALITY;
+        }
+    }
+
+    /**
+     * Validate YouTube URL format
+     */
+    private boolean isValidYouTubeUrl(@Nullable String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
+        }
+
+        String trimmedUrl = url.trim().toLowerCase();
+        return trimmedUrl.contains("youtube.com") ||
+               trimmedUrl.contains("youtu.be") ||
+               trimmedUrl.contains("m.youtube.com");
     }
 
     /**
@@ -144,6 +222,8 @@ public class StreamDownloader {
 
         StreamType effectiveStreamType = determineEffectiveStreamType(streamType);
         listener.onStreamTypeDetected(effectiveStreamType);
+
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
 
         switch (effectiveStreamType) {
             case AUDIO_ONLY:
@@ -174,13 +254,12 @@ public class StreamDownloader {
         }
 
         DashStreamCoordinator coordinator = new DashStreamCoordinator(listener);
-        
+
         listener.onProgress("Extracting DASH streams...");
-        
-        // Extract audio stream
+
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
+
         extractAudioWithCoordinator(youtubeUrl, qualityMode, coordinator);
-        
-        // Extract video stream
         extractVideoWithCoordinator(youtubeUrl, qualityMode, coordinator);
     }
 
@@ -190,21 +269,23 @@ public class StreamDownloader {
     private void extractAudioOnly(@NonNull String youtubeUrl, @NonNull QualityMode qualityMode,
                                  @NonNull OnStreamExtractListener listener) {
         listener.onProgress("Extracting audio stream...");
-        
+
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
+
         AudioStreamDownloader.OnAudioExtractListener audioListener = new AudioStreamDownloader.OnAudioExtractListener() {
             @Override
             public void onSuccess(@NonNull String audioUrl, int bitrate, @NonNull String format) {
-                listener.onAudioStreamReady(audioUrl, bitrate, format);
+                postToMainThread(() -> listener.onAudioStreamReady(audioUrl, bitrate, format));
             }
 
             @Override
             public void onError(@NonNull Exception e) {
-                listener.onError(e);
+                postToMainThread(() -> listener.onError(e));
             }
 
             @Override
             public void onProgress(@NonNull String status) {
-                listener.onProgress(status);
+                postToMainThread(() -> listener.onProgress(status));
             }
         };
 
@@ -215,8 +296,8 @@ public class StreamDownloader {
             case HIGH_QUALITY:
                 audioDownloader.loadHighQualityAudio(youtubeUrl, audioListener);
                 break;
-            case USER_PREFERENCE:
             case STANDARD:
+            case USER_PREFERENCE:
             default:
                 audioDownloader.loadDefaultAudio(youtubeUrl, audioListener);
                 break;
@@ -229,21 +310,23 @@ public class StreamDownloader {
     private void extractVideoOnly(@NonNull String youtubeUrl, @NonNull QualityMode qualityMode,
                                  @NonNull OnStreamExtractListener listener) {
         listener.onProgress("Extracting video stream...");
-        
+
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
+
         VideoStreamDownloader.OnVideoExtractListener videoListener = new VideoStreamDownloader.OnVideoExtractListener() {
             @Override
             public void onSuccess(@NonNull String videoUrl, @NonNull String resolution, @NonNull String format) {
-                listener.onVideoStreamReady(videoUrl, resolution, format);
+                postToMainThread(() -> listener.onVideoStreamReady(videoUrl, resolution, format));
             }
 
             @Override
             public void onError(@NonNull Exception e) {
-                listener.onError(e);
+                postToMainThread(() -> listener.onError(e));
             }
 
             @Override
             public void onProgress(@NonNull String status) {
-                listener.onProgress(status);
+                postToMainThread(() -> listener.onProgress(status));
             }
         };
 
@@ -254,8 +337,8 @@ public class StreamDownloader {
             case HIGH_QUALITY:
                 videoDownloader.loadHighQualityVideo(youtubeUrl, videoListener);
                 break;
-            case USER_PREFERENCE:
             case STANDARD:
+            case USER_PREFERENCE:
             default:
                 videoDownloader.loadDefaultVideo(youtubeUrl, videoListener);
                 break;
@@ -268,24 +351,26 @@ public class StreamDownloader {
     private void extractMixedStream(@NonNull String youtubeUrl, @NonNull QualityMode qualityMode,
                                    @NonNull OnStreamExtractListener listener) {
         listener.onProgress("Extracting mixed stream...");
-        
+
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
+
         MixedStreamDownloader.QualityPreference preference = convertQualityMode(qualityMode);
-        
+
         MixedStreamDownloader.OnMixedStreamExtractListener mixedListener = new MixedStreamDownloader.OnMixedStreamExtractListener() {
             @Override
-            public void onSuccess(@NonNull String streamUrl, @NonNull String resolution, 
+            public void onSuccess(@NonNull String streamUrl, @NonNull String resolution,
                                  @NonNull String format, @NonNull String quality) {
-                listener.onMixedStreamReady(streamUrl, resolution, format, quality);
+                postToMainThread(() -> listener.onMixedStreamReady(streamUrl, resolution, format, quality));
             }
 
             @Override
             public void onError(@NonNull Exception error) {
-                listener.onError(error);
+                postToMainThread(() -> listener.onError(error));
             }
 
             @Override
             public void onProgress(@NonNull String status) {
-                listener.onProgress(status);
+                postToMainThread(() -> listener.onProgress(status));
             }
         };
 
@@ -301,24 +386,27 @@ public class StreamDownloader {
             @Override
             public void onStreamsReady(@NonNull String audioUrl, int audioBitrate, @NonNull String audioFormat,
                                       @NonNull String videoUrl, @NonNull String videoResolution, @NonNull String videoFormat) {
-                // Notify both streams are ready
-                listener.onAudioStreamReady(audioUrl, audioBitrate, audioFormat);
-                listener.onVideoStreamReady(videoUrl, videoResolution, videoFormat);
+                postToMainThread(() -> {
+                    listener.onAudioStreamReady(audioUrl, audioBitrate, audioFormat);
+                    listener.onVideoStreamReady(videoUrl, videoResolution, videoFormat);
+                });
             }
 
             @Override
             public void onError(@NonNull Exception error) {
-                listener.onError(error);
+                postToMainThread(() -> listener.onError(error));
             }
 
             @Override
             public void onProgress(@NonNull String status) {
-                listener.onProgress(status);
+                postToMainThread(() -> listener.onProgress(status));
             }
         });
 
         listener.onProgress("Extracting DASH streams...");
-        
+
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
+
         extractAudioWithCoordinator(youtubeUrl, qualityMode, coordinator);
         extractVideoWithCoordinator(youtubeUrl, qualityMode, coordinator);
     }
@@ -352,8 +440,8 @@ public class StreamDownloader {
             case HIGH_QUALITY:
                 audioDownloader.loadHighQualityAudio(youtubeUrl, audioListener);
                 break;
-            case USER_PREFERENCE:
             case STANDARD:
+            case USER_PREFERENCE:
             default:
                 audioDownloader.loadDefaultAudio(youtubeUrl, audioListener);
                 break;
@@ -389,64 +477,12 @@ public class StreamDownloader {
             case HIGH_QUALITY:
                 videoDownloader.loadHighQualityVideo(youtubeUrl, videoListener);
                 break;
-            case USER_PREFERENCE:
             case STANDARD:
+            case USER_PREFERENCE:
             default:
                 videoDownloader.loadDefaultVideo(youtubeUrl, videoListener);
                 break;
         }
-    }
-
-    /**
-     * Determine effective stream type based on preferences and availability
-     */
-    private StreamType determineEffectiveStreamType(@NonNull StreamType requestedType) {
-        if (requestedType != StreamType.AUTO_DETECT) {
-            return requestedType;
-        }
-
-        PrefsHelper.StreamModes modes = PrefsHelper.getModes(context);
-        
-        // Logic to determine stream type based on user preferences
-        // Priority: Mixed streams for compatibility, DASH for quality control
-        boolean preferHighQuality = "high".equals(modes.videoMode) || "high".equals(modes.audioMode);
-
-        if (preferHighQuality) {
-            return StreamType.DASH_STREAMS; // High quality users get separate streams for better control
-        } else {
-            return StreamType.MIXED_STREAM; // Default to mixed streams for compatibility
-        }
-    }
-
-    /**
-     * Convert QualityMode to MixedStreamDownloader.QualityPreference
-     */
-    private MixedStreamDownloader.QualityPreference convertQualityMode(@NonNull QualityMode qualityMode) {
-        switch (qualityMode) {
-            case DATA_SAVER:
-                return MixedStreamDownloader.QualityPreference.LOW_QUALITY;
-            case HIGH_QUALITY:
-                return MixedStreamDownloader.QualityPreference.HIGH_QUALITY;
-            case STANDARD:
-                return MixedStreamDownloader.QualityPreference.MEDIUM_QUALITY;
-            case USER_PREFERENCE:
-            default:
-                return MixedStreamDownloader.QualityPreference.AUTO_QUALITY;
-        }
-    }
-
-    /**
-     * Validate YouTube URL format
-     */
-    private boolean isValidYouTubeUrl(@Nullable String url) {
-        if (url == null || url.trim().isEmpty()) {
-            return false;
-        }
-        
-        String trimmedUrl = url.trim().toLowerCase();
-        return trimmedUrl.contains("youtube.com") || 
-               trimmedUrl.contains("youtu.be") ||
-               trimmedUrl.contains("m.youtube.com");
     }
 
     /**
@@ -461,7 +497,7 @@ public class StreamDownloader {
         listener.onProgress("Analyzing available streams...");
 
         StreamInfoCollector collector = new StreamInfoCollector(listener);
-        
+
         // Collect audio quality information
         audioDownloader.getAvailableQualities(youtubeUrl, new AudioStreamDownloader.OnQualityListListener() {
             @Override
@@ -480,7 +516,7 @@ public class StreamDownloader {
      * Interface for receiving comprehensive stream information
      */
     public interface OnStreamInfoListener {
-        void onStreamInfoReady(@NonNull java.util.List<String> audioQualities, 
+        void onStreamInfoReady(@NonNull java.util.List<String> audioQualities,
                               @NonNull java.util.List<String> videoQualities,
                               boolean supportsMixed, boolean supportsDash);
         void onError(@NonNull Exception error);
@@ -497,6 +533,8 @@ public class StreamDownloader {
             return;
         }
 
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
+
         switch (qualityMode) {
             case DATA_SAVER:
                 audioDownloader.loadDataSaverAudio(youtubeUrl, listener);
@@ -504,8 +542,8 @@ public class StreamDownloader {
             case HIGH_QUALITY:
                 audioDownloader.loadHighQualityAudio(youtubeUrl, listener);
                 break;
-            case USER_PREFERENCE:
             case STANDARD:
+            case USER_PREFERENCE:
             default:
                 audioDownloader.loadDefaultAudio(youtubeUrl, listener);
                 break;
@@ -522,6 +560,8 @@ public class StreamDownloader {
             return;
         }
 
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
+
         switch (qualityMode) {
             case DATA_SAVER:
                 videoDownloader.loadDataSaverVideo(youtubeUrl, listener);
@@ -529,8 +569,8 @@ public class StreamDownloader {
             case HIGH_QUALITY:
                 videoDownloader.loadHighQualityVideo(youtubeUrl, listener);
                 break;
-            case USER_PREFERENCE:
             case STANDARD:
+            case USER_PREFERENCE:
             default:
                 videoDownloader.loadDefaultVideo(youtubeUrl, listener);
                 break;
@@ -547,6 +587,7 @@ public class StreamDownloader {
             return;
         }
 
+        qualityMode = resolveUserPreferenceQualityMode(qualityMode);
         MixedStreamDownloader.QualityPreference preference = convertQualityMode(qualityMode);
         mixedDownloader.loadMixedStreamWithQuality(youtubeUrl, preference, listener);
     }
@@ -572,43 +613,43 @@ public class StreamDownloader {
 
         public synchronized void setAudioStream(@NonNull String url, int bitrate, @NonNull String format) {
             if (errorOccurred) return;
-            
+
             this.audioUrl = url;
             this.audioBitrate = bitrate;
             this.audioFormat = format;
             this.audioReady = true;
-            
+
             checkCompletion();
         }
 
         public synchronized void setVideoStream(@NonNull String url, @NonNull String resolution, @NonNull String format) {
             if (errorOccurred) return;
-            
+
             this.videoUrl = url;
             this.videoResolution = resolution;
             this.videoFormat = format;
             this.videoReady = true;
-            
+
             checkCompletion();
         }
 
         public synchronized void handleError(@NonNull Exception error) {
             if (!errorOccurred) {
                 errorOccurred = true;
-                listener.onError(error);
+                postToMainThread(() -> listener.onError(error));
             }
         }
 
         public void updateProgress(@NonNull String status) {
             if (!errorOccurred) {
-                listener.onProgress(status);
+                postToMainThread(() -> listener.onProgress(status));
             }
         }
 
         private void checkCompletion() {
             if (audioReady && videoReady && !errorOccurred) {
-                listener.onStreamsReady(audioUrl, audioBitrate, audioFormat, 
-                                       videoUrl, videoResolution, videoFormat);
+                postToMainThread(() -> listener.onStreamsReady(audioUrl, audioBitrate, audioFormat,
+                        videoUrl, videoResolution, videoFormat));
             }
         }
     }
@@ -628,22 +669,32 @@ public class StreamDownloader {
 
         public synchronized void setAudioQualities(@NonNull java.util.List<String> qualities) {
             if (errorOccurred) return;
-            
+
             this.audioQualities = qualities;
             this.audioInfoReady = true;
-            
-            // For now, we'll provide basic information
-            // In a full implementation, you would also collect video quality information
+
+            // For now, provide some default video qualities
             java.util.List<String> videoQualities = java.util.Arrays.asList("720p", "480p", "360p", "240p", "144p");
-            
-            listener.onStreamInfoReady(audioQualities, videoQualities, true, true);
+
+            postToMainThread(() -> listener.onStreamInfoReady(audioQualities, videoQualities, true, true));
         }
 
         public synchronized void handleError(@NonNull Exception error) {
             if (!errorOccurred) {
                 errorOccurred = true;
-                listener.onError(error);
+                postToMainThread(() -> listener.onError(error));
             }
+        }
+    }
+
+    /**
+     * Post runnable to main thread handler safely
+     */
+    private void postToMainThread(@NonNull Runnable runnable) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            runnable.run();
+        } else {
+            mainHandler.post(runnable);
         }
     }
 
