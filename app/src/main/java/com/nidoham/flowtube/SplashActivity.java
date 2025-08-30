@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityOptionsCompat;
 import com.nidoham.flowtube.core.language.AppLanguage;
 import com.nidoham.flowtube.databinding.ActivitySplashBinding;
+import com.nidoham.flowtube.stream.prefs.PrefsHelper;
 
 public class SplashActivity extends AppCompatActivity {
     private ActivitySplashBinding binding;
@@ -23,6 +24,9 @@ public class SplashActivity extends AppCompatActivity {
         
         binding = ActivitySplashBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        
+        PrefsHelper.setAudioMode(getApplicationContext(), "high");
+        PrefsHelper.setVideoMode(getApplicationContext(), "high");
         
         if(true) {
         	navigateToNextScreen();
