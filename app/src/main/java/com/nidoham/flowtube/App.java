@@ -583,6 +583,12 @@ public class App extends Application {
     public static Context getAppContext(){
         return getInstance().getApplicationContext();
     }
+    
+    @Override
+    public void onTerminate() {
+        super.onTerminate();
+        PicassoHelper.terminate();
+    }
 
     @Override
     public void onLowMemory() {

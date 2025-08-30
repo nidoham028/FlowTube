@@ -1,6 +1,5 @@
 package com.nidoham.flowtube;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
@@ -29,20 +28,15 @@ import com.nidoham.flowtube.stream.extractor.StreamExtractor;
 import com.nidoham.opentube.player.PlayerViewModel;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 
-/**
- * Professional video player activity with Media3 ExoPlayer integration.
- * Supports YouTube URL extraction, fullscreen playback, and modern Android features.
- */
 public class PlayerActivity extends AppCompatActivity {
 
     private static final String TAG = "PlayerActivity";
-    
-    // Intent extras
+
     public static final String EXTRA_VIDEO_URL = "video_url";
     public static final String EXTRA_VIDEO_TITLE = "video_title";
     public static final String EXTRA_CHANNEL_NAME = "channel_name";
     public static final String EXTRA_PLAYBACK_POSITION = "playback_position";
-    
+
     private static final int CONTROLS_HIDE_DELAY_MS = 3000;
     private static final int SEEK_INCREMENT_MS = 10000;
 
@@ -51,7 +45,7 @@ public class PlayerActivity extends AppCompatActivity {
     private StreamExtractor streamExtractor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
-    
+
     private String videoUrl = "";
     private String videoTitle = "";
     private String channelName = "";
@@ -61,10 +55,10 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         binding = ActivityPlayerBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        
+
         setupSystemUI();
         initializeComponents();
         extractIntentData(savedInstanceState);
@@ -92,7 +86,7 @@ public class PlayerActivity extends AppCompatActivity {
                 channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME);
             }
         }
-        
+
         videoUrl = videoUrl != null ? videoUrl : "";
         videoTitle = videoTitle != null ? videoTitle : "Untitled";
         channelName = channelName != null ? channelName : "";
@@ -101,7 +95,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void setupPlayer() {
         ExoPlayer player = playerViewModel.getExoPlayer();
         binding.playerView.setPlayer(player);
-        
+
         player.addListener(new Player.Listener() {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
@@ -111,7 +105,7 @@ public class PlayerActivity extends AppCompatActivity {
             @Override
             public void onPlaybackStateChanged(int state) {
                 updateProgress();
-                 if (state == Player.STATE_BUFFERING) {
+                if (state == Player.STATE_BUFFERING) {
                     showLoading(true);
                 } else {
                     showLoading(false);
@@ -127,7 +121,7 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         showLoading(true);
-        
+
         if (isYouTubeUrl(videoUrl)) {
             extractYouTubeStreams();
         } else {
@@ -177,6 +171,7 @@ public class PlayerActivity extends AppCompatActivity {
             playerViewModel.playStream(audioUrl, videoUrl);
             seekToPosition();
             showLoading(false);
+            showControlsTemporarily();
         } catch (Exception e) {
             showError("Failed to load streams: " + e.getMessage());
         }
@@ -187,6 +182,7 @@ public class PlayerActivity extends AppCompatActivity {
             playerViewModel.playMedia(videoUrl);
             seekToPosition();
             showLoading(false);
+            showControlsTemporarily();
         } catch (Exception e) {
             showError("Failed to load video: " + e.getMessage());
         }
@@ -221,15 +217,22 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void setupControls() {
         ExoPlayer player = playerViewModel.getExoPlayer();
-        
+
         binding.btnPlayPause.setOnClickListener(v -> {
             if (player != null) {
                 playerViewModel.togglePlayPause();
+                showControlsTemporarily();
             }
         });
 
-        binding.btnReplay10.setOnClickListener(v -> seekRelative(-SEEK_INCREMENT_MS));
-        binding.btnForward10.setOnClickListener(v -> seekRelative(SEEK_INCREMENT_MS));
+        binding.btnReplay10.setOnClickListener(v -> {
+            seekRelative(-SEEK_INCREMENT_MS);
+            showControlsTemporarily();
+        });
+        binding.btnForward10.setOnClickListener(v -> {
+            seekRelative(SEEK_INCREMENT_MS);
+            showControlsTemporarily();
+        });
         binding.btnOrientation.setOnClickListener(v -> toggleOrientation());
         binding.btnBack.setOnClickListener(v -> finish());
     }
@@ -250,10 +253,12 @@ public class PlayerActivity extends AppCompatActivity {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             isFullscreen = false;
             showSystemUI();
+            showControlsTemporarily();
         } else {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             isFullscreen = true;
             hideSystemUI();
+            showControlsTemporarily();
         }
     }
 
@@ -267,6 +272,7 @@ public class PlayerActivity extends AppCompatActivity {
                 ExoPlayer player = playerViewModel.getExoPlayer();
                 wasPlaying = player != null && player.isPlaying();
                 if (wasPlaying) playerViewModel.pause();
+                showControlsTemporarily();
             }
 
             @Override
@@ -280,19 +286,21 @@ public class PlayerActivity extends AppCompatActivity {
                     }
                 }
                 if (wasPlaying) playerViewModel.play();
+                showControlsTemporarily();
             }
 
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
                     ExoPlayer player = playerViewModel.getExoPlayer();
-                     if (player != null) {
+                    if (player != null) {
                         long duration = player.getDuration();
                         if (duration > 0) {
                             long newPosition = (duration * progress) / 1000L;
                             binding.txtCurrentTime.setText(formatTime(newPosition));
                         }
                     }
+                    showControlsTemporarily();
                 }
             }
         });
@@ -310,13 +318,18 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void toggleControlsVisibility() {
         boolean isVisible = binding.controlsOverlay.getVisibility() == View.VISIBLE;
-        binding.controlsOverlay.setVisibility(isVisible ? View.INVISIBLE : View.VISIBLE);
-        
-        if (!isVisible) {
-            startHideTimer();
-        } else {
+        if (isVisible) {
+            binding.controlsOverlay.setVisibility(View.INVISIBLE);
             cancelHideTimer();
+        } else {
+            binding.controlsOverlay.setVisibility(View.VISIBLE);
+            startHideTimer();
         }
+    }
+
+    private void showControlsTemporarily() {
+        binding.controlsOverlay.setVisibility(View.VISIBLE);
+        startHideTimer();
     }
 
     private void startHideTimer() {
@@ -361,7 +374,6 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void updatePlayPauseButton(boolean isPlaying) {
-        // FIXED: Using built-in Android drawables to avoid compilation errors.
         int iconRes = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
         binding.btnPlayPause.setImageResource(iconRes);
     }
@@ -389,8 +401,8 @@ public class PlayerActivity extends AppCompatActivity {
             }
         } else {
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         }
     }
 
@@ -401,7 +413,7 @@ public class PlayerActivity extends AppCompatActivity {
                 controller.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
             }
         } else {
-             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
         }
     }
 
@@ -426,8 +438,8 @@ public class PlayerActivity extends AppCompatActivity {
         if (url == null || url.trim().isEmpty()) return false;
         String normalizedUrl = url.trim().toLowerCase();
         return normalizedUrl.contains("youtube.com/watch") ||
-               normalizedUrl.contains("youtu.be/") ||
-               normalizedUrl.contains("youtube.com/embed/");
+                normalizedUrl.contains("youtu.be/") ||
+                normalizedUrl.contains("youtube.com/embed/");
     }
 
     @Override
@@ -437,11 +449,11 @@ public class PlayerActivity extends AppCompatActivity {
             playerViewModel.pause();
         }
     }
-    
+
     @Override
     protected void onStop() {
         super.onStop();
-         if (playerViewModel != null) {
+        if (playerViewModel != null) {
             playerViewModel.pause();
         }
     }
@@ -463,14 +475,13 @@ public class PlayerActivity extends AppCompatActivity {
             outState.putLong(EXTRA_PLAYBACK_POSITION, player.getCurrentPosition());
         }
         outState.putString(EXTRA_VIDEO_URL, videoUrl);
-        // FIXED: Corrected typo from out_stateputString to outState.putString
         outState.putString(EXTRA_VIDEO_TITLE, videoTitle);
         outState.putString(EXTRA_CHANNEL_NAME, channelName);
     }
 
     @Override
     public void onBackPressed() {
-         if (isFullscreen) {
+        if (isFullscreen) {
             toggleOrientation();
         } else {
             super.onBackPressed();

@@ -129,7 +129,7 @@ public class StreamDownloader {
      * Download streams with automatic type detection based on user preferences
      */
     public void downloadStream(@NonNull String youtubeUrl, @NonNull OnStreamExtractListener listener) {
-        downloadStreamWithQuality(youtubeUrl, QualityMode.USER_PREFERENCE, StreamType.AUTO_DETECT, listener);
+        downloadStreamWithQuality(youtubeUrl, QualityMode.HIGH_QUALITY, StreamType.AUTO_DETECT, listener);
     }
 
     /**
