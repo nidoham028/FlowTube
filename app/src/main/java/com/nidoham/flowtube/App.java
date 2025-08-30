@@ -60,6 +60,8 @@ public class App extends Application {
     private DownloaderImpl downloaderImpl;
     private final AtomicBoolean isInitialized = new AtomicBoolean(false);
     private Thread.UncaughtExceptionHandler defaultExceptionHandler;
+    
+    public static String USER_AGENT = DownloaderImpl.USER_AGENT;
 
     @Override
     public void onCreate() {

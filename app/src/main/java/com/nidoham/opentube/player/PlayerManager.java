@@ -2,10 +2,14 @@ package com.nidoham.opentube.player;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.Tracks;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -17,20 +21,20 @@ import androidx.media3.exoplayer.source.MergingMediaSource;
 import androidx.media3.exoplayer.source.ProgressiveMediaSource;
 import androidx.media3.exoplayer.dash.DashMediaSource;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
+import androidx.media3.exoplayer.upstream.Allocator;
+import androidx.media3.exoplayer.upstream.DefaultAllocator;
 
-/**
- * Singleton PlayerManager class that manages a single ExoPlayer instance for the entire app.
- * Handles merging of separate audio and video streams for DASH/HLS content.
- * Uses Media3 ExoPlayer APIs.
- */
+import com.nidoham.flowtube.App;
+
 public class PlayerManager {
     private static final String TAG = "PlayerManager";
     private static PlayerManager instance;
     private static final Object lock = new Object();
 
     private ExoPlayer exoPlayer;
-    private Context applicationContext;
+    private final Context applicationContext;
     private DefaultDataSource.Factory dataSourceFactory;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private PlayerManager(Context context) {
         this.applicationContext = context.getApplicationContext();
@@ -38,9 +42,6 @@ public class PlayerManager {
         initializePlayer();
     }
 
-    /**
-     * Get the singleton instance of PlayerManager
-     */
     public static PlayerManager getInstance(Context context) {
         if (instance == null) {
             synchronized (lock) {
@@ -52,50 +53,47 @@ public class PlayerManager {
         return instance;
     }
 
-    /**
-     * Initialize the data source factory for network requests
-     */
     private void initializeDataSourceFactory() {
         DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
-                .setUserAgent(Util.getUserAgent(applicationContext, "YourAppName"))
+                .setUserAgent(Util.getUserAgent(applicationContext, App.USER_AGENT))
                 .setConnectTimeoutMs(DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS)
                 .setReadTimeoutMs(DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS)
                 .setAllowCrossProtocolRedirects(true);
-
         dataSourceFactory = new DefaultDataSource.Factory(applicationContext, httpDataSourceFactory);
     }
 
-    /**
-     * Initialize the ExoPlayer instance with custom LoadControl for buffering
-     */
     private void initializePlayer() {
         if (exoPlayer == null) {
-            int MIN_BUFFER_DURATION = 3000; // 3 seconds
-            int MAX_BUFFER_DURATION = 8000; // 8 seconds
-            int MIN_PLAYBACK_RESUME_BUFFER = 1500; // 1.5 seconds
-            int MIN_PLAYBACK_START_BUFFER = 500; // 0.5 seconds
-
-            LoadControl loadControl = new DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(
-                            MIN_BUFFER_DURATION,
-                            MAX_BUFFER_DURATION,
-                            MIN_PLAYBACK_START_BUFFER,
-                            MIN_PLAYBACK_RESUME_BUFFER)
-                    .setTargetBufferBytes(-1)
-                    .setPrioritizeTimeOverSizeThresholds(true)
-                    .build();  // createDefaultLoadControl() নয় build() ব্যবহার করুন
+            LoadControl loadControl = new CustomLoadControl();
 
             exoPlayer = new ExoPlayer.Builder(applicationContext)
                     .setLoadControl(loadControl)
                     .build();
 
-            Log.d(TAG, "Media3 ExoPlayer initialized with custom LoadControl");
+            Log.i(TAG, "Media3 ExoPlayer initialized with CustomLoadControl");
         }
     }
 
-    /**
-     * Get the ExoPlayer instance
-     */
+    // Custom LoadControl implementing YouTube-like buffering (updated for Media3)
+    private static class CustomLoadControl extends DefaultLoadControl {
+        private static final int MIN_BUFFER_MS = 30000; // 30 seconds
+        private static final int MAX_BUFFER_MS = 50000; // 50 seconds
+        private static final int BUFFER_FOR_PLAYBACK_MS = 1500; // 1.5 seconds
+        private static final int BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 3000; // 3 seconds
+
+        public CustomLoadControl() {
+            super(new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
+                    MIN_BUFFER_MS,
+                    MAX_BUFFER_MS,
+                    BUFFER_FOR_PLAYBACK_MS,
+                    BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
+                    C.LENGTH_UNSET,
+                    false,
+                    C.DEFAULT_BUFFER_SEGMENT_SIZE,
+                    false);
+        }
+    }
+
     public ExoPlayer getExoPlayer() {
         if (exoPlayer == null) {
             initializePlayer();
@@ -103,135 +101,124 @@ public class PlayerManager {
         return exoPlayer;
     }
 
-    /**
-     * Play stream by merging separate audio and video URLs
-     * Supports DASH, HLS, and progressive streams
-     *
-     * @param audioUrl URL of the audio stream
-     * @param videoUrl URL of the video stream
-     */
     public void playStream(String audioUrl, String videoUrl) {
         if (exoPlayer == null) {
             initializePlayer();
         }
-
         try {
             MediaSource audioSource = createMediaSource(audioUrl);
             MediaSource videoSource = createMediaSource(videoUrl);
 
-            // Merge audio and video sources
             MergingMediaSource mergingMediaSource = new MergingMediaSource(videoSource, audioSource);
 
-            // Prepare and play
             exoPlayer.setMediaSource(mergingMediaSource);
             exoPlayer.prepare();
+            forceBufferDownload();
             exoPlayer.setPlayWhenReady(true);
 
-            Log.d(TAG, "Playing merged stream - Audio: " + audioUrl + ", Video: " + videoUrl);
-
+            Log.i(TAG, "Playing merged stream: Audio=" + audioUrl + ", Video=" + videoUrl);
         } catch (Exception e) {
-            Log.e(TAG, "Error playing stream", e);
+            Log.e(TAG, "Error playing merged stream", e);
         }
     }
 
-    /**
-     * Play a single media source
-     *
-     * @param mediaUrl URL of the media to play
-     */
     public void playMedia(String mediaUrl) {
         if (exoPlayer == null) {
             initializePlayer();
         }
-
         try {
             MediaSource mediaSource = createMediaSource(mediaUrl);
             exoPlayer.setMediaSource(mediaSource);
             exoPlayer.prepare();
+            forceBufferDownload();
             exoPlayer.setPlayWhenReady(true);
 
-            Log.d(TAG, "Playing media: " + mediaUrl);
-
+            Log.i(TAG, "Playing media: " + mediaUrl);
         } catch (Exception e) {
             Log.e(TAG, "Error playing media", e);
         }
     }
 
-    /**
-     * Create appropriate MediaSource based on URL type
-     */
     private MediaSource createMediaSource(String url) {
         Uri uri = Uri.parse(url);
         int contentType = Util.inferContentType(uri);
-
         switch (contentType) {
-            case C.TYPE_DASH:
-                return new DashMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(MediaItem.fromUri(uri));
-            case C.TYPE_HLS:
-                return new HlsMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(MediaItem.fromUri(uri));
-            case C.TYPE_OTHER:
+            case C.CONTENT_TYPE_DASH:
+                return new DashMediaSource.Factory(dataSourceFactory).createMediaSource(MediaItem.fromUri(uri));
+            case C.CONTENT_TYPE_HLS:
+                return new HlsMediaSource.Factory(dataSourceFactory).createMediaSource(MediaItem.fromUri(uri));
+            case C.CONTENT_TYPE_OTHER:
             default:
-                return new ProgressiveMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(MediaItem.fromUri(uri));
+                return new ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(MediaItem.fromUri(uri));
         }
     }
 
-    /**
-     * Pause playback
-     */
+    // Force buffer download by periodically checking buffered duration
+    private final long FORCE_BUFFER_MIN_MS = 30000;  // 30 seconds minimum buffer
+    private final long FORCE_BUFFER_CHECK_INTERVAL_MS = 1000; // 1 second
+
+    private final Runnable bufferForceRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (exoPlayer == null) return;
+
+            long bufferedMs = exoPlayer.getBufferedPosition() - exoPlayer.getCurrentPosition();
+            if (bufferedMs < FORCE_BUFFER_MIN_MS) {
+                if (!exoPlayer.getPlayWhenReady()) {
+                    exoPlayer.setPlayWhenReady(true);
+                }
+            }
+            mainHandler.postDelayed(this, FORCE_BUFFER_CHECK_INTERVAL_MS);
+        }
+    };
+
+    // Start force buffer download
+    public void forceBufferDownload() {
+        mainHandler.removeCallbacks(bufferForceRunnable);
+        mainHandler.post(bufferForceRunnable);
+    }
+
+    // Stop force buffer download
+    public void stopForceBufferDownload() {
+        mainHandler.removeCallbacks(bufferForceRunnable);
+    }
+
     public void pause() {
         if (exoPlayer != null) {
             exoPlayer.setPlayWhenReady(false);
+            stopForceBufferDownload();
         }
     }
 
-    /**
-     * Resume playback
-     */
     public void play() {
         if (exoPlayer != null) {
             exoPlayer.setPlayWhenReady(true);
+            forceBufferDownload();
         }
     }
 
-    /**
-     * Stop playback
-     */
     public void stop() {
         if (exoPlayer != null) {
             exoPlayer.stop();
+            stopForceBufferDownload();
         }
     }
 
-    /**
-     * Seek to specific position
-     *
-     * @param positionMs Position in milliseconds
-     */
     public void seekTo(long positionMs) {
         if (exoPlayer != null) {
             exoPlayer.seekTo(positionMs);
         }
     }
 
-    /**
-     * Release the player and clean up resources
-     * Call this when the app is being destroyed
-     */
     public void releasePlayer() {
         if (exoPlayer != null) {
             exoPlayer.release();
             exoPlayer = null;
-            Log.d(TAG, "Media3 ExoPlayer released");
+            stopForceBufferDownload();
+            Log.i(TAG, "Media3 ExoPlayer released");
         }
     }
 
-    /**
-     * Release the singleton instance
-     * Call this when the app is being destroyed
-     */
     public static void releaseInstance() {
         synchronized (lock) {
             if (instance != null) {
@@ -240,5 +227,4 @@ public class PlayerManager {
             }
         }
     }
-
 }

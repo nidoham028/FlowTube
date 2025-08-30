@@ -200,11 +200,12 @@
     </androidx.media3.ui.PlayerView>
 
     <SeekBar
-         android:layout_height="wrap_content"
+         android:layout_height="4dp"
          android:layout_width="0dp"
+         android:thumbTint="#FF0000"
          android:thumb="@drawable/custom_thumb"
          android:max="1000"
-         android:layout_marginHorizontal="16dp"
+         android:layout_marginHorizontal="4dp"
          app:layout_constraintStart_toStartOf="parent"
          app:layout_constraintEnd_toEndOf="parent"
          style="?android:attr/progressBarStyleHorizontal"
