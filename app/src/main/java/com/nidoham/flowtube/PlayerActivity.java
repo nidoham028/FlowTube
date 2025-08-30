@@ -28,6 +28,7 @@ import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import com.nidoham.flowtube.databinding.ActivityPlayerBinding;
+import com.nidoham.flowtube.stream.extractor.InformationExtractor;
 import com.nidoham.flowtube.stream.extractor.StreamExtractor;
 import com.nidoham.opentube.player.PlayerViewModel;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -245,8 +246,14 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void updateStreamInfo(StreamInfo streamInfo) {
+        InformationExtractor info = new InformationExtractor(streamInfo);
+        
         binding.txtTitle.setText(streamInfo.getName());
         binding.txtChannelName.setText(streamInfo.getUploaderName());
+        
+        binding.txtMeta.setText(info.getTextMeta());
+        binding.txtLikeCount.setText(info.getFormattedLikeCount());
+        binding.txtSubscriberCount.setText(info.getFormattedSubscriptionCount());
     }
 
     private void setupControls() {
